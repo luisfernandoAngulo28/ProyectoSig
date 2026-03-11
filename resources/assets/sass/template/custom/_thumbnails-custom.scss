@@ -1,0 +1,31 @@
+//
+// Custom Thumbnails
+// --------------------------------------------------
+
+.thumbnail{
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+
+  .caption{
+    padding: 0;
+    color: $gray-base;
+  }
+}
+
+.img-thumbnail,
+.thumbnail{
+  box-shadow: none;
+}
+
+// Make thumbnails to fit entire container width
+.thumbnail-block {
+  display: block;
+
+  > img,
+  a > img {
+    width: 100%;
+    height: auto;
+  }
+}

@@ -1,0 +1,17 @@
+html, body { height: 100%; }
+
+/* Global */
+.center { text-align: center; }
+.right { text-align: right; }
+.left { text-align: left; }
+.alert { margin-top: 20px; }
+.alert.alert-success { font-size: 16px; font-weight: bold; }
+.error { color: red; font-size: 13px; }
+.content { text-align: center; }
+.row.no-gutters { margin-right: 0; margin-left: 0;
+    > [class^="col-"], .row.no-gutters > [class*=" col-"] { padding-right: 0; padding-left: 0; }
+}
+
+/* Masonry */
+.grid { position: relative; }
+.grid-sizer, .grid-item { min-height: auto !important; }

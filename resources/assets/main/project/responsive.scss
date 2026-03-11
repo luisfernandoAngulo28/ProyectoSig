@@ -1,0 +1,79 @@
+@media only screen and (max-width: 479.98px){
+	.mobile-menu { margin-top: 15px;}
+}
+
+@media screen and (max-width: 576px) {
+	.row_ctt .ctt_category { display: block; }
+	.mobile-menu{ margin-top: 0px; }
+}
+
+@media screen and (max-width: 580px) {
+	.solunes-store .order-block { padding: 20px 22px 10px; margin-bottom: 20px; }
+	.solunes-store .order-block h3, .solunes-store h3 { font-size: 15px; }
+	.mobile-menu{ margin-top: 0px; }
+}
+
+@media screen and (max-width: 767px) and (min-width: 450px) {
+
+}
+
+@media screen and (max-width: 767px) {
+	.grid_cntnt { grid-template-columns: 1fr 1fr;
+		.contnt_cat-gb a { padding: 20px; }
+	}
+	.contnt_cat-gb a { padding: 20px; }
+	#popup{ width: 90% }
+	.mobile-menu{ margin-top: 0px; }
+}
+
+@media screen and (min-width: 768px) {
+
+}
+
+@media screen and (max-width: 991px) {
+	.solunes-store .col-lg-6.col-md-6:first-child { margin-bottom: 20px; }
+	.header-area { display: flex; flex-flow: column-reverse;
+		.header-middle-area.theme-color-4 { background-color: #fff; padding: 20px 0;
+			.search-box-wrapper {  
+				&:not(.eac-item) { text-align: center; }
+				.search-box-inner { display: inline-block; margin: auto; max-width: 100%;
+					.easy-autocomplete.eac-round { margin: auto; width: 350px !important; }
+				}
+			}
+		}
+	}
+}
+@media only screen and (min-width: 768px) and (max-width: 991.98px), only screen and (max-width: 767.98px){
+	.mobile-main-header{ border-bottom: 0; }
+}
+@media screen and ( min-width: 768px) and ( max-width: 991px ) {
+	.mobile-main-header{ border-bottom: 0; }
+}
+
+@media screen and ( min-width: 992px) {
+	.shop-product-wrap.row.list-view .col-md-4 { -webkit-box-flex: 0; -webkit-flex: 0 0 50%; -ms-flex: 0 0 50%; flex: 0 0 50%; max-width: 50%; }
+}
+
+@media screen and ( min-width: 992px) and ( max-width: 1199px ) {
+	
+}
+
+@media screen and ( max-width: 1024px) {
+	
+}
+
+@media screen and ( min-width: 992px) and ( max-width: 1199px ) {
+
+}
+
+@media screen and ( max-width: 1315px) and ( min-width: 1200px) {
+
+}
+
+@media screen and ( max-width: 1440px) {
+	
+}
+
+@media screen and ( max-width: 1760px) and ( min-width: 1315px) {
+
+}

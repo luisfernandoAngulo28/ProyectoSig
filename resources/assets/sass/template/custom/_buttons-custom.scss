@@ -1,0 +1,167 @@
+//
+// Custom Buttons Styles
+// --------------------------------------------------
+
+// Base styles
+// --------------------------------------------------
+
+.btn {
+  transition: .3s ease-out;
+  font-family: $font-family-sec;
+  font-size: 16px;
+  line-height: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border: 4px solid transparent;
+  border-radius:0;
+
+
+  &:focus,
+  &:active,
+  &:active:focus{
+    outline: none;
+  }
+
+
+  &,
+  &:active,
+  &.active {
+    &:focus,
+    &.focus {
+
+    }
+  }
+
+  &:hover,
+  &:focus,
+  &.focus {
+
+  }
+
+  &:active,
+  &.active {
+    @include box-shadow(none);
+  }
+
+  &.disabled,
+  &[disabled],
+  fieldset[disabled] & {
+
+  }
+}
+
+
+// Alternate buttons
+// --------------------------------------------------
+
+.btn-default {
+  @include button-variant-custom($white, transparent, $white, $white, $gray-darker, $gray-darker);
+}
+.btn-default{
+  &:focus{
+    color: $white!important;
+    background: transparent!important;
+    border-color: $white!important;
+  }
+}
+.btn-primary {
+  @include button-variant-custom($white, $brand-primary, $brand-primary, $brand-primary, transparent,$brand-primary);
+}
+.btn-primary{
+  &:focus{
+    color: $white!important;
+    background: $brand-primary!important;
+    border-color: $brand-primary!important;
+  }
+}
+// Success appears as green
+.btn-success {
+
+}
+
+// Info appears as blue-green
+.btn-info {
+
+}
+
+// Warning appears as orange
+.btn-warning {
+
+}
+
+// Danger and error appear as red
+.btn-danger {
+
+}
+
+
+// Button Sizes
+// --------------------------------------------------
+
+.btn-xs {
+
+}
+
+.btn-sm {
+  @media (min-width: $screen-xs-min) {
+    padding: 20px 36px ;
+  }
+  padding: 20px 10px ;
+}
+.btn-md {
+  @media (min-width: $screen-xs-min) {
+    padding: 20px 56px ;
+  }
+  padding: 20px 20px ;
+}
+.btn-lg {
+
+}
+
+
+// Button Shapes
+// --------------------------------------------------
+
+.btn-rect {
+  border-radius: 0;
+}
+
+
+// Button Icon styles
+// --------------------------------------------------
+
+.btn{
+
+  &.btn-icon {
+    padding-left: 17px;
+    padding-right: 17px;
+
+    .icon {
+      font-size: 28px;
+      line-height: 28px;
+      vertical-align: middle;
+      transition: 0s;
+    }
+
+    &-left{
+      .icon{
+        float: left;
+        padding-right: 10px;
+      }
+    }
+
+    &-right{
+      .icon{
+        float: right;
+        padding-left: 10px;
+      }
+    }
+
+  }
+}
+.button-group{
+  margin-top: 36px;
+  .btn+.btn{
+    margin-left: 30px;
+  }
+}

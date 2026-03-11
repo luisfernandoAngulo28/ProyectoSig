@@ -1,0 +1,1621 @@
+<?php
+
+namespace App\Http\Controllers\Auth;
+
+use Illuminate\Http\Request;
+
+use App\Http\Requests;
+use App\Http\Controllers\Controller;
+use JWTAuth;
+use Tymon\JWTAuth\Exceptions\JWTException;
+use App\Helpers\SpecialFunc;
+
+class AuthenticateController extends Controller {
+  
+    public function authenticate(Request $request) {
+        $credentials = $request->only('email', 'password');
+        try {
+            // verify the credentials and create a token for the user
+            if (! $token = JWTAuth::attempt($credentials)) {
+                return response()->json(['error' => 'Su usuario y contraseña no coinciden.'], 401);
+            }
+        } catch (JWTException $e) {
+            // something went wrong
+            return response()->json(['error' => 'Hubo un error, vuelva a intentarlo.'], 500);
+        }
+        $date = date('d/n/Y H:i:s', strtotime('+6 months'));
+        $array = ['token'=>$token, 'expirationDate'=>$date];
+        $user = auth()->user();
+        if($driver = $user->driver){
+            $array = array_merge($array, \Func::get_deliveries($driver));
+        }
+        // if no errors are encountered we can return a JWT
+        return response()->json($array, 200);
+    }
+
+
+    public function sendCodeEmail(Request $request){
+        $validator = \Validator::make($request->all(), [
+            'email' => 'required',
+        ],[
+            'email.required' => 'El campo email es requerido.',
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => ['Debes enviar los parámetros'],
+                'errors' => $validator->errors()->all(),
+            ], 400);
+        }
+
+        try {
+            $userFind = \App\User::where('email', $request->input('email'))->first();
+            if(!$userFind)
+                return  response()->json(['status'=>false, 'message'=>['No existe un usuario con este email en los registros.'], 'errors'=>['Email inválido']] , 400);   
+            else{
+                $otpCode = \Func::generateOTP(6);
+                $newOtp = new \App\Otp;
+                $newOtp->code = $otpCode;
+                $newOtp->time_expiration_code = time() + 3600;
+                $newOtp->parent_id = $userFind->id;
+                $newOtp->save();
+                \SpecialFunc::send_email( "Recuperar Contraseña", [ $request->input('email') ], 'Reestablecer contraseña.', 
+                'Para restablecer su contraseña, por favor, ingrese el siguiente código en la aplicación móvil y siga las instrucciones proporcionadas. Tenga en cuenta que este código tendrá una validez de 60 minutos: Código:' .$otpCode  );
+
+                return ['status'=>true, 'message'=>'El código se envió correctamente.', 'errors'=>[], 'data'=>['code'=>$otpCode]];
+            } 
+
+        } catch (\Throwable $th) {
+            echo $th;
+            return  response()->json(['status'=>false, 'message'=>'Error en el servidor.', 'errors'=>[ $th->getMessage() ]] , 500);   
+        }
+    }
+
+    public function recoverPassword(Request $request){
+        try {
+            $validator = \Validator::make($request->all(), [
+                'code' => 'required',
+                'password' => 'required',
+            ],[
+                'code.required' => 'El campo code es requerido.',
+                'password.required' => 'El campo password es requerido.',
+            ]);
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => ['Debes enviar los parámetros'],
+                    'errors' => $validator->errors()->all(),
+                ], 400);
+            }
+            // dd("HOLA>>");
+
+            $codeOtpFind = \App\Otp::where('code', $request->input('code'))->first();
+
+            if($codeOtpFind){
+                $timeNow = time();
+                if($timeNow > $codeOtpFind->time_expiration_code){
+                    return response()->json(['status'=>false, 'message'=>['El código ya expiró vuelva a solicitarlo.'], 'errors'=>[ 'Código inválido.' ]] , 400);
+                }else{
+                    $password = $request->input('password');
+                    $user = \App\User::where('id', $codeOtpFind->parent_id)->first();
+                    \App\User::where('id', $user->id)->update(['password'=> bcrypt($password) ]);
+                    return response()->json(['status'=>true, 'message'=>['La contraseña fue reestablecida correctamente. '], 'errors'=>[  ]] , 200);
+                }
+            }else{
+                return response()->json(['status'=>false, 'message'=>['El código no existe vuelva a solicitarlo.'], 'errors'=>[ 'Código inválido.' ]] , 400);
+            }
+        } catch (\Throwable $th) {
+            return  response()->json(['status'=>false, 'message'=>['Error en el servidor.'], 'errors'=>[ $th->getMessage() ]] , 500);
+        }
+    }
+
+    
+    public function validCode(Request $request){
+        try {
+            
+            $validator = \Validator::make($request->all(), [
+                'code' => 'required',
+            ],[
+                'code.required' => 'El campo code es requerido.',
+            ]);
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => ['Debes enviar los parámetros'],
+                    'errors' => $validator->errors()->all(),
+                ], 400);
+            }
+            
+            $codeOtpFind = \App\Otp::where('code', $request->input('code'))->first();
+
+            if($codeOtpFind){
+                $timeNow = time();
+                if($timeNow > $codeOtpFind->time_expiration_code){
+                    return response()->json(['status'=>false, 'message'=>['El código ya expiró vuelva a solicitarlo.'], 'errors'=>[ 'Código inválido.' ]] , 400);
+                }else{
+                    return response()->json(['status'=>true, 'message'=>['Código válido.'], 'errors'=>[]] , 200);
+                }
+            }else{
+                return response()->json(['status'=>false, 'message'=>['El código no existe vuelva a solicitarlo.'], 'errors'=>[ 'Código inválido.' ]] , 400);
+            }
+
+
+        } catch (\Throwable $th) {
+            return  response()->json(['status'=>false, 'message'=>['Error en el servidor.'], 'errors'=>[ $th->getMessage() ]] , 500);
+        }
+    }
+
+    /**
+     * Send OTP code to phone number (for new user registration)
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function sendOtpPhone(Request $request){
+        $validator = \Validator::make($request->all(), [
+            'phone' => 'required|digits:9',
+        ],[
+            'phone.required' => 'El campo teléfono es requerido.',
+            'phone.digits' => 'El teléfono debe tener 9 dígitos.',
+        ]);
+        
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => ['Debes enviar los parámetros correctamente'],
+                'errors' => $validator->errors()->all(),
+            ], 400);
+        }
+
+        try {
+            $phone = $request->input('phone');
+            
+            // Verificar si el teléfono ya está registrado
+            $userExists = \App\User::where('cellphone', $phone)->first();
+            if($userExists) {
+                return response()->json([
+                    'status' => false, 
+                    'message' => ['Este número de teléfono ya está registrado.'], 
+                    'errors' => ['Teléfono ya existe']
+                ], 400);
+            }
+            
+            // Generar código OTP de 6 dígitos
+            $otpCode = \Func::generateOTP(6);
+            
+            // Crear registro OTP
+            $newOtp = new \App\Otp;
+            $newOtp->phone = $phone;
+            $newOtp->code = $otpCode;
+            $newOtp->type = 'phone';
+            $newOtp->time_expiration_code = time() + 600; // 10 minutos
+            $newOtp->parent_id = 0; // Usuario aún no creado
+            $newOtp->save();
+            
+            // Enviar SMS con código OTP via Twilio
+            $smsMessage = "Tu código de verificación AnDre Taxi es: " . $otpCode . ". Válido por 10 minutos.";
+            $smsSent = $this->sendSMS($phone, $smsMessage);
+            
+            if (!$smsSent) {
+                \Log::warning("SMS could not be sent to: {$phone}, but OTP was saved.");
+                // Continuar aunque el SMS falle (útil para testing)
+            }
+            
+            return response()->json([
+                'status' => true, 
+                'message' => 'Código OTP enviado correctamente.', 
+                'errors' => [],
+                'data' => [
+                    'code' => $otpCode, // ⚠️ ELIMINAR EN PRODUCCIÓN - Solo para testing
+                    'expires_in' => 600 // 10 minutos
+                ]
+            ], 200);
+            
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => false, 
+                'message' => 'Error en el servidor.', 
+                'errors' => [$th->getMessage()]
+            ], 500);
+        }
+    }
+
+    /**
+     * Verify OTP code from phone
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function verifyOtpPhone(Request $request){
+        $validator = \Validator::make($request->all(), [
+            'phone' => 'required|digits:9',
+            'code' => 'required|digits:6',
+        ],[
+            'phone.required' => 'El campo teléfono es requerido.',
+            'phone.digits' => 'El teléfono debe tener 9 dígitos.',
+            'code.required' => 'El campo código es requerido.',
+            'code.digits' => 'El código debe tener 6 dígitos.',
+        ]);
+        
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => ['Debes enviar los parámetros correctamente'],
+                'errors' => $validator->errors()->all(),
+            ], 400);
+        }
+
+        try {
+            $phone = $request->input('phone');
+            $code = $request->input('code');
+            
+            // Buscar el código OTP más reciente para este teléfono
+            $codeOtpFind = \App\Otp::where('phone', $phone)
+                                    ->where('code', $code)
+                                    ->where('type', 'phone')
+                                    ->orderBy('created_at', 'desc')
+                                    ->first();
+
+            if(!$codeOtpFind) {
+                return response()->json([
+                    'status' => false, 
+                    'message' => ['El código no es válido.'], 
+                    'errors' => ['Código inválido.']
+                ], 400);
+            }
+            
+            // Verificar si el código expiró
+            $timeNow = time();
+            if($timeNow > $codeOtpFind->time_expiration_code) {
+                return response()->json([
+                    'status' => false, 
+                    'message' => ['El código ya expiró. Solicita uno nuevo.'], 
+                    'errors' => ['Código expirado.']
+                ], 400);
+            }
+            
+            // Código válido, generar token temporal
+            $tempToken = str_random(60);
+            
+            // Actualizar el OTP con el token temporal
+            $codeOtpFind->temp_token = $tempToken;
+            $codeOtpFind->save();
+            
+            return response()->json([
+                'status' => true, 
+                'message' => ['Código verificado correctamente.'], 
+                'errors' => [],
+                'data' => [
+                    'temp_token' => $tempToken,
+                    'phone' => $phone
+                ]
+            ], 200);
+            
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => false, 
+                'message' => ['Error en el servidor.'], 
+                'errors' => [$th->getMessage()]
+            ], 500);
+        }
+    }
+
+    /**
+     * Register new user with phone number (after OTP verification)
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function registerWithPhone(Request $request){
+        $validator = \Validator::make($request->all(), [
+            'temp_token' => 'required',
+            'phone' => 'required|digits:9',
+            'name' => 'required|min:2',
+            'gender' => 'required|in:male,female',
+            'photo' => 'nullable|string',
+        ],[
+            'temp_token.required' => 'Token temporal requerido.',
+            'phone.required' => 'El campo teléfono es requerido.',
+            'phone.digits' => 'El teléfono debe tener 9 dígitos.',
+            'name.required' => 'El campo nombre es requerido.',
+            'name.min' => 'El nombre debe tener al menos 2 caracteres.',
+            'gender.required' => 'El campo género es requerido.',
+            'gender.in' => 'El género debe ser male o female.',
+        ]);
+        
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => ['Debes enviar los parámetros correctamente'],
+                'errors' => $validator->errors()->all(),
+            ], 400);
+        }
+
+        try {
+            $tempToken = $request->input('temp_token');
+            $phone = $request->input('phone');
+            
+            // Verificar el token temporal
+            $otpRecord = \App\Otp::where('temp_token', $tempToken)
+                                  ->where('phone', $phone)
+                                  ->where('type', 'phone')
+                                  ->orderBy('created_at', 'desc')
+                                  ->first();
+            
+            if(!$otpRecord) {
+                return response()->json([
+                    'status' => false, 
+                    'message' => ['Token inválido o expirado.'], 
+                    'errors' => ['Token inválido.']
+                ], 400);
+            }
+            
+            // Verificar que no pasaron más de 30 minutos desde la verificación
+            $timeNow = time();
+            $tokenCreatedTime = strtotime($otpRecord->updated_at);
+            if(($timeNow - $tokenCreatedTime) > 1800) { // 30 minutos
+                return response()->json([
+                    'status' => false, 
+                    'message' => ['Token expirado. Por favor inicia el proceso nuevamente.'], 
+                    'errors' => ['Token expirado.']
+                ], 400);
+            }
+            
+            // Verificar nuevamente que el teléfono no esté registrado
+            $userExists = \App\User::where('cellphone', $phone)->first();
+            if($userExists) {
+                return response()->json([
+                    'status' => false, 
+                    'message' => ['Este número de teléfono ya está registrado.'], 
+                    'errors' => ['Teléfono ya existe']
+                ], 400);
+            }
+            
+            // Crear el usuario
+            $user = new \App\User;
+            $user->name = $request->input('name');
+            $user->cellphone = $phone;
+            $user->email = $phone . '@andre.app'; // Email generado
+            $user->password = bcrypt(str_random(16)); // Password aleatorio
+            $user->gender = $request->input('gender');
+            $user->type = 'customer'; // Tipo pasajero
+            $user->active = 1;
+            $user->verified = 1;
+            
+            // Si hay foto
+            if($request->has('photo')) {
+                $user->image = $request->input('photo');
+            }
+            
+            $user->save();
+            
+            // Actualizar el OTP con el user_id
+            $otpRecord->parent_id = $user->id;
+            $otpRecord->save();
+            
+            // Generar token JWT
+            $token = JWTAuth::fromUser($user);
+            
+            return response()->json([
+                'status' => true, 
+                'message' => ['Usuario registrado correctamente.'], 
+                'errors' => [],
+                'data' => [
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'cellphone' => $user->cellphone,
+                        'email' => $user->email,
+                        'gender' => $user->gender,
+                        'image' => $user->image,
+                    ],
+                    'token' => $token,
+                    'expirationDate' => date('d/n/Y H:i:s', strtotime('+6 months'))
+                ]
+            ], 201);
+            
+        } catch (\Throwable $th) {
+            return response()->json([
+                'status' => false, 
+                'message' => ['Error en el servidor.'], 
+                'errors' => [$th->getMessage()]
+            ], 500);
+        }
+    }
+
+    /**
+     * Send SMS using Twilio (to be implemented)
+     * 
+     * @param string $phone
+     * @param string $message
+     * @return bool
+     */
+    private function sendSMS($phone, $message){
+        try {
+            // Obtener credenciales de Twilio desde .env
+            $sid = env('TWILIO_SID');
+            $token = env('TWILIO_AUTH_TOKEN');
+            $twilioNumber = env('TWILIO_PHONE_NUMBER');
+            
+            // Validar que las credenciales estén configuradas
+            if (empty($sid) || empty($token) || empty($twilioNumber)) {
+                \Log::error('Twilio credentials not configured in .env');
+                return false;
+            }
+            
+            // Crear cliente de Twilio
+            $client = new \Twilio\Rest\Client($sid, $token);
+            
+            // Enviar SMS
+            $client->messages->create(
+                '+51' . $phone, // Número de destino (Perú)
+                [
+                    'from' => $twilioNumber,
+                    'body' => $message
+                ]
+            );
+            
+            \Log::info("SMS sent successfully to: +51{$phone}");
+            return true;
+            
+        } catch (\Exception $e) {
+            \Log::error('Twilio SMS Error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    // ==========================================
+    // ENDPOINTS PARA REGISTRO DE CONDUCTOR
+    // ==========================================
+    
+    /**
+     * Enviar código OTP para conductor
+     * POST /api-auth/send-otp-phone-driver
+     */
+    public function sendOtpPhoneDriver(Request $request)
+    {
+        $validator = \Validator::make($request->all(), [
+            'phone' => 'required|digits:9',
+        ]);
+        
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Número de teléfono inválido',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+        
+        $phone = $request->phone;
+        
+        // Verificar si el conductor ya existe
+        $driverExists = \App\Driver::where('cellphone', $phone)->first();
+        if ($driverExists) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Este número ya está registrado como conductor'
+            ], 400);
+        }
+        
+        // Generar código OTP de 6 dígitos
+        $code = \App\Func::generateOTP(6);
+        $expirationTime = time() + 600; // 10 minutos
+        
+        // Guardar código en base de datos
+        $codeOtp = new \App\Otp;
+        $codeOtp->phone = $phone;
+        $codeOtp->code = $code;
+        $codeOtp->type = 'phone';
+        $codeOtp->time_expiration_code = $expirationTime;
+        $codeOtp->save();
+        
+        // Enviar SMS con código
+        $message = "Tu código de verificación AnDre Conductor es: {$code}";
+        $smsSent = $this->sendSMS($phone, $message);
+        
+        // Log para debugging
+        \Log::info("OTP generado para conductor {$phone}: {$code}");
+        
+        return response()->json([
+            'status' => true,
+            'message' => 'Código OTP enviado correctamente',
+            'data' => [
+                'code' => $code, // Solo para testing, remover en producción
+                'expires_in' => 600,
+                'sms_sent' => $smsSent
+            ]
+        ], 200);
+    }
+    
+    /**
+     * Verificar código OTP para conductor
+     * POST /api-auth/verify-otp-phone-driver
+     */
+    public function verifyOtpPhoneDriver(Request $request)
+    {
+        $validator = \Validator::make($request->all(), [
+            'phone' => 'required|digits:9',
+            'code' => 'required|digits:6',
+        ]);
+        
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Datos inválidos',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+        
+        $phone = $request->phone;
+        $code = $request->code;
+        
+        // Buscar el código en la base de datos
+        $codeOtpFind = \App\Otp::where('phone', $phone)
+            ->where('code', $code)
+            ->where('type', 'phone')
+            ->orderBy('created_at', 'desc')
+            ->first();
+        
+        if (!$codeOtpFind) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Código incorrecto o no encontrado'
+            ], 400);
+        }
+        
+        // Verificar si el código ha expirado
+        if (time() > $codeOtpFind->time_expiration_code) {
+            return response()->json([
+                'status' => false,
+                'message' => 'El código ha expirado. Solicita uno nuevo.'
+            ], 400);
+        }
+        
+        // Generar token temporal para completar registro (válido por 30 minutos)
+        $tempToken = str_random(60);
+        $codeOtpFind->temp_token = $tempToken;
+        $codeOtpFind->save();
+        
+        \Log::info("Código verificado para conductor {$phone}, token temporal: {$tempToken}");
+        
+        return response()->json([
+            'status' => true,
+            'message' => 'Código verificado correctamente',
+            'data' => [
+                'temp_token' => $tempToken,
+                'phone' => $phone
+            ]
+        ], 200);
+    }
+    
+    /**
+     * Registrar conductor con teléfono
+     * POST /api-auth/register-driver-with-phone
+     */
+    public function registerDriverWithPhone(Request $request)
+    {
+        $validator = \Validator::make($request->all(), [
+            'temp_token' => 'required',
+            'phone' => 'required|digits:9',
+            'name' => 'required|min:2',
+            'email' => 'email', // Opcional: solo valida formato si se envía
+            'gender' => 'required|in:male,female',
+            'company_type' => 'required|in:auto_economico,auto_confort,moto_taxi,delivery',
+            'photo' => 'string', // Base64 opcional (sin 'nullable' por Laravel 5.2)
+            'photo_brevete' => 'required|string', // Base64 obligatorio
+            'photo_ci' => 'required|string', // Base64 obligatorio
+        ]);
+        
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Datos incompletos o inválidos',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+        
+        $tempToken = $request->temp_token;
+        $phone = $request->phone;
+        $name = $request->name;
+        $gender = $request->gender;
+        $companyType = $request->company_type;
+        
+        // Verificar el token temporal
+        $codeOtp = \App\Otp::where('phone', $phone)
+            ->where('temp_token', $tempToken)
+            ->where('type', 'phone')
+            ->orderBy('created_at', 'desc')
+            ->first();
+        
+        if (!$codeOtp) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Token inválido o expirado'
+            ], 400);
+        }
+        
+        // Verificar que el token no tenga más de 30 minutos
+        $tokenAge = time() - strtotime($codeOtp->updated_at);
+        if ($tokenAge > 1800) { // 30 minutos
+            return response()->json([
+                'status' => false,
+                'message' => 'El token ha expirado. Por favor, comienza el proceso nuevamente.'
+            ], 400);
+        }
+        
+        // Verificar que el conductor no exista
+        $driverExists = \App\Driver::where('cellphone', $phone)->first();
+        if ($driverExists) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Este número ya está registrado'
+            ], 400);
+        }
+        
+        // Separar nombre y apellido
+        $nameParts = explode(' ', $name, 2);
+        $firstName = $nameParts[0];
+        $lastName = isset($nameParts[1]) ? $nameParts[1] : '';
+        
+        // Mapear company_type a organization_id (ajustar según tu DB)
+        $organizationMap = [
+            'auto_economico' => 1,
+            'auto_confort' => 2,
+            'moto_taxi' => 3,
+            'delivery' => 4,
+        ];
+        $organizationId = $organizationMap[$companyType] ?? 1;
+        
+        // Procesar imágenes base64
+        $imagePath = null;
+        if ($request->has('photo') && !empty($request->photo)) {
+            $imagePath = $this->saveBase64Image($request->photo, 'drivers/profiles');
+        }
+        
+        $brevetePath = $this->saveBase64Image($request->photo_brevete, 'drivers/brevetes');
+        $ciPath = $this->saveBase64Image($request->photo_ci, 'drivers/ci');
+        
+        // Crear el conductor
+        $driver = new \App\Driver;
+        $driver->first_name = $firstName;
+        $driver->last_name = $lastName;
+        // Usar email proporcionado o generar uno automático
+        $driver->email = $request->has('email') && !empty($request->email) 
+            ? $request->email 
+            : $phone . '@andre.app'; 
+        $driver->cellphone = $phone;
+        $driver->gender = $gender;
+        $driver->city_id = 1; // Ciudad por defecto, ajustar según necesidad
+        $driver->organization_id = $organizationId;
+        $driver->image = $imagePath ?? 'default-driver.png';
+        $driver->license_number = 'PENDING'; // Será completado después
+        $driver->license_back_image = $brevetePath;
+        $driver->license_front_image = $brevetePath; // Misma foto para ambos lados por ahora
+        $driver->ci_back_image = $ciPath;
+        $driver->ci_front_image = $ciPath; // Misma foto para ambos lados por ahora
+        $driver->number_of_passengers = 4; // Por defecto
+        $driver->active_trips = 0;
+        $driver->car_with_grill = 0;
+        $driver->travel_with_pets = 0;
+        $driver->password = bcrypt(str_random(16)); // Contraseña aleatoria
+        $driver->active = 0; // Pendiente de aprobación
+        $driver->verified = 0; // Pendiente de verificación
+        $driver->save();
+        
+        // Vincular el OTP al conductor
+        $codeOtp->parent_id = $driver->id;
+        $codeOtp->save();
+        
+        \Log::info("Conductor registrado: ID {$driver->id}, Phone: {$phone}");
+        
+        return response()->json([
+            'status' => true,
+            'message' => 'Conductor registrado exitosamente',
+            'data' => [
+                'driver' => [
+                    'id' => $driver->id,
+                    'name' => $driver->first_name . ' ' . $driver->last_name,
+                    'email' => $driver->email,
+                    'cellphone' => $driver->cellphone,
+                    'gender' => $driver->gender,
+                    'company_type' => $companyType,
+                    'active' => $driver->active,
+                    'verified' => $driver->verified,
+                ],
+                'message' => 'Tu registro está pendiente de aprobación. Te notificaremos vía WhatsApp cuando sea aprobado.',
+            ]
+        ], 201);
+    }
+    
+    /**
+     * Helper: Guardar imagen base64
+     */
+    private function saveBase64Image($base64String, $folder = 'uploads')
+    {
+        try {
+            // Eliminar prefijo si existe (data:image/png;base64,)
+            if (preg_match('/^data:image\/(\w+);base64,/', $base64String, $type)) {
+                $base64String = substr($base64String, strpos($base64String, ',') + 1);
+                $type = strtolower($type[1]); // jpg, png, gif
+            } else {
+                $type = 'png';
+            }
+            
+            $base64String = str_replace(' ', '+', $base64String);
+            $imageData = base64_decode($base64String);
+            
+            if ($imageData === false) {
+                return null;
+            }
+            
+            // Generar nombre único
+            $fileName = uniqid() . '.' . $type;
+            $filePath = $folder . '/' . $fileName;
+            $fullPath = public_path($filePath);
+            
+            // Crear directorio si no existe
+            $directory = dirname($fullPath);
+            if (!file_exists($directory)) {
+                mkdir($directory, 0755, true);
+            }
+            
+            // Guardar archivo
+            file_put_contents($fullPath, $imageData);
+            
+            return $filePath;
+            
+        } catch (\Exception $e) {
+            \Log::error('Error guardando imagen base64: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * LOGIN CON TELÉFONO - PASAJERO
+     * Paso 1: Enviar OTP al teléfono del pasajero que ya existe
+     */
+    public function loginWithPhone(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'phone' => 'required|string|min:9|max:9',
+            ]);
+            
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => $validator->errors()->first(),
+                ], 400);
+            }
+            
+            $phone = $request->phone;
+            
+            // Validar que el usuario EXISTA en la base de datos
+            $user = User::where('phone', $phone)->first();
+            
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No existe una cuenta con ese número. Por favor regístrate primero.',
+                ], 404);
+            }
+            
+            // Generar código OTP de 6 dígitos
+            $code = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+            
+            // Guardar en tabla otp
+            $otp = new Otp();
+            $otp->parent_id = $user->id;
+            $otp->code = $code;
+            $otp->type = 'phone';
+            $otp->expiry = now()->addMinutes(10);
+            $otp->save();
+            
+            // Enviar SMS con Twilio
+            $message = "Tu código de acceso AnDre es: {$code}. Válido por 10 minutos.";
+            $this->sendSMS($phone, $message);
+            
+            return response()->json([
+                'status' => true,
+                'message' => 'Código enviado a tu teléfono',
+                'code' => $code, // SOLO PARA TESTING, remover en producción
+            ], 200);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error en loginWithPhone: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'Error al enviar código: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * LOGIN CON TELÉFONO - PASAJERO
+     * Paso 2: Verificar OTP y devolver JWT
+     */
+    public function loginVerifyPhone(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'phone' => 'required|string|min:9|max:9',
+                'code' => 'required|string|size:6',
+            ]);
+            
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => $validator->errors()->first(),
+                ], 400);
+            }
+            
+            $phone = $request->phone;
+            $code = $request->code;
+            
+            // Buscar usuario
+            $user = User::where('phone', $phone)->first();
+            
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Usuario no encontrado',
+                ], 404);
+            }
+            
+            // Validar OTP
+            $otp = Otp::where('parent_id', $user->id)
+                      ->where('code', $code)
+                      ->where('type', 'phone')
+                      ->where('expiry', '>', now())
+                      ->orderBy('created_at', 'desc')
+                      ->first();
+            
+            if (!$otp) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Código inválido o expirado',
+                ], 400);
+            }
+            
+            // Eliminar OTP usado
+            $otp->delete();
+            
+            // Generar JWT token
+            $token = JWTAuth::fromUser($user);
+            
+            return response()->json([
+                'status' => true,
+                'message' => 'Inicio de sesión exitoso',
+                'data' => [
+                    'token' => $token,
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'phone' => $user->phone,
+                        'gender' => $user->gender,
+                        'photo' => $user->photo ? url($user->photo) : null,
+                    ]
+                ]
+            ], 200);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error en loginVerifyPhone: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'Error al verificar código: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * LOGIN CON TELÉFONO - CONDUCTOR
+     * Paso 1: Enviar OTP al teléfono del conductor que ya existe
+     */
+    public function loginWithPhoneDriver(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'phone' => 'required|string|min:9|max:9',
+            ]);
+            
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => $validator->errors()->first(),
+                ], 400);
+            }
+            
+            $phone = $request->phone;
+            
+            // Validar que el conductor EXISTA en la base de datos
+            $driver = Driver::where('phone', $phone)->first();
+            
+            if (!$driver) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No existe una cuenta de conductor con ese número. Por favor regístrate primero.',
+                ], 404);
+            }
+            
+            // Validar que el conductor esté ACTIVO (aprobado)
+            if ($driver->active != 1) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Tu cuenta está pendiente de aprobación. Espera la confirmación por WhatsApp.',
+                ], 403);
+            }
+            
+            // Generar código OTP de 6 dígitos
+            $code = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+            
+            // Guardar en tabla otp
+            $otp = new Otp();
+            $otp->parent_id = $driver->id;
+            $otp->code = $code;
+            $otp->type = 'phone_driver';
+            $otp->expiry = now()->addMinutes(10);
+            $otp->save();
+            
+            // Enviar SMS con Twilio
+            $message = "Tu código de acceso AnDre Conductor es: {$code}. Válido por 10 minutos.";
+            $this->sendSMS($phone, $message);
+            
+            return response()->json([
+                'status' => true,
+                'message' => 'Código enviado a tu teléfono',
+                'code' => $code, // SOLO PARA TESTING, remover en producción
+            ], 200);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error en loginWithPhoneDriver: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'Error al enviar código: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * LOGIN CON TELÉFONO - CONDUCTOR  
+     * Paso 2: Verificar OTP y devolver JWT
+     */
+    public function loginVerifyPhoneDriver(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'phone' => 'required|string|min:9|max:9',
+                'code' => 'required|string|size:6',
+            ]);
+            
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => $validator->errors()->first(),
+                ], 400);
+            }
+            
+            $phone = $request->phone;
+            $code = $request->code;
+            
+            // Buscar conductor
+            $driver = Driver::where('phone', $phone)->first();
+            
+            if (!$driver) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Conductor no encontrado',
+                ], 404);
+            }
+            
+            // Validar que esté activo
+            if ($driver->active != 1) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Tu cuenta está pendiente de aprobación',
+                ], 403);
+            }
+            
+            // Validar OTP
+            $otp = Otp::where('parent_id', $driver->id)
+                      ->where('code', $code)
+                      ->where('type', 'phone_driver')
+                      ->where('expiry', '>', now())
+                      ->orderBy('created_at', 'desc')
+                      ->first();
+            
+            if (!$otp) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Código inválido o expirado',
+                ], 400);
+            }
+            
+            // Eliminar OTP usado
+            $otp->delete();
+            
+            // Verificar estado de foto facial (actualización mensual)
+            $facialPhotoStatus = $this->checkFacialPhotoStatus($driver);
+            
+            // Generar JWT token
+            $token = JWTAuth::fromUser($driver);
+            
+            return response()->json([
+                'status' => true,
+                'message' => 'Inicio de sesión exitoso',
+                'data' => [
+                    'token' => $token,
+                    'driver' => [
+                        'id' => $driver->id,
+                        'first_name' => $driver->first_name,
+                        'last_name' => $driver->last_name,
+                        'cellphone' => $driver->cellphone,
+                        'organization_id' => $driver->organization_id,
+                        'active' => $driver->active,
+                        'image' => $driver->image ? url($driver->image) : null,
+                        'gender' => $driver->gender ?? 'male',
+                    ],
+                    'facial_photo_status' => $facialPhotoStatus, // INFO DE ACTUALIZACIÓN MENSUAL
+                ]
+            ], 200);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error en loginVerifyPhoneDriver: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'Error al verificar código: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    // REGISTRO DE VEHÍCULO - CONDUCTOR
+
+    /**
+     * Obtener lista de marcas de vehículos activas
+     */
+    public function getVehicleBrands(Request $request)
+    {
+        try {
+            $type_vehicle = $request->input('type_vehicle', 'auto'); // auto o moto
+            
+            $brands = \App\VehicleBrand::where('active', 1)
+                ->where('type_vehicle', $type_vehicle)
+                ->orderBy('name', 'asc')
+                ->get(['id', 'name', 'type_vehicle']);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Marcas obtenidas exitosamente',
+                'data' => [
+                    'brands' => $brands
+                ]
+            ], 200);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error en getVehicleBrands: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'Error al obtener marcas: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener lista de modelos según marca
+     */
+    public function getVehicleModels(Request $request)
+    {
+        try {
+            $brand_id = $request->input('brand_id');
+            
+            if (!$brand_id) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'El ID de la marca es requerido',
+                ], 400);
+            }
+
+            $models = \App\VehicleModel::where('vehicle_brand_id', $brand_id)
+                ->where('active', 1)
+                ->orderBy('name', 'asc')
+                ->get(['id', 'name', 'vehicle_brand_id']);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Modelos obtenidos exitosamente',
+                'data' => [
+                    'models' => $models
+                ]
+            ], 200);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error en getVehicleModels: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'Error al obtener modelos: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Registrar vehículo de conductor
+     */
+    public function registerDriverVehicle(Request $request)
+    {
+        try {
+            // Validaciones (Laravel 5.2 compatible - sin 'nullable')
+            $validator = \Validator::make($request->all(), [
+                'driver_id' => 'required|exists:drivers,id',
+                'type_vehicle' => 'required|in:auto,moto,torito',
+                'vehicle_brand_id' => 'required|exists:vehicle_brands,id',
+                'vehicle_model_id' => 'required|exists:vehicle_models,id',
+                'number_plate' => 'required|string|max:255',
+                'color' => 'required|string|max:255',
+                'model_year' => 'digits:4', // Opcional en Laravel 5.2 (no required = opcional)
+                'vehicle_image' => 'image|mimes:jpeg,jpg,png|max:5120', // 5MB max, opcional
+                'side_image' => 'image|mimes:jpeg,jpg,png|max:5120', // Opcional
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Errores de validación',
+                    'errors' => $validator->errors()
+                ], 400);
+            }
+
+            $driver = \App\Driver::find($request->driver_id);
+            if (!$driver) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Conductor no encontrado',
+                ], 404);
+            }
+
+            // Verificar si ya tiene un vehículo activo
+            $existingVehicle = \App\DriverVehicle::where('parent_id', $driver->id)
+                ->where('active', 1)
+                ->first();
+
+            if ($existingVehicle) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'El conductor ya tiene un vehículo registrado',
+                    'data' => [
+                        'vehicle_id' => $existingVehicle->id
+                    ]
+                ], 400);
+            }
+
+            // Crear vehículo
+            $vehicle = new \App\DriverVehicle();
+            $vehicle->parent_id = $driver->id;
+            $vehicle->city_id = $driver->city_id ?? 1; // Ciudad por defecto
+            $vehicle->type_vehicle = $request->type_vehicle;
+            $vehicle->vehicle_brand_id = $request->vehicle_brand_id;
+            $vehicle->vehicle_model_id = $request->vehicle_model_id;
+            $vehicle->number_plate = strtoupper($request->number_plate);
+            $vehicle->color = $request->color;
+            $vehicle->model_year = $request->model_year;
+            $vehicle->active = 1;
+
+            // Procesar imagen del vehículo
+            if ($request->hasFile('vehicle_image')) {
+                $image = $request->file('vehicle_image');
+                $imageName = 'vehicle_' . $driver->id . '_' . time() . '.' . $image->getClientOriginalExtension();
+                $image->move(public_path('images/vehicles'), $imageName);
+                $vehicle->vehicle_image = 'images/vehicles/' . $imageName;
+            }
+
+            // Procesar imagen lateral
+            if ($request->hasFile('side_image')) {
+                $sideImage = $request->file('side_image');
+                $sideImageName = 'side_' . $driver->id . '_' . time() . '.' . $sideImage->getClientOriginalExtension();
+                $sideImage->move(public_path('images/vehicles'), $sideImageName);
+                $vehicle->side_image = 'images/vehicles/' . $sideImageName;
+            }
+
+            $vehicle->save();
+
+            // Cargar relaciones
+            $vehicle->load(['vehicle_brand', 'vehicle_model']);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Vehículo registrado exitosamente',
+                'data' => [
+                    'vehicle' => [
+                        'id' => $vehicle->id,
+                        'type_vehicle' => $vehicle->type_vehicle,
+                        'number_plate' => $vehicle->number_plate,
+                        'color' => $vehicle->color,
+                        'model_year' => $vehicle->model_year,
+                        'vehicle_image' => $vehicle->vehicle_image,
+                        'side_image' => $vehicle->side_image,
+                        'brand' => $vehicle->vehicle_brand ? $vehicle->vehicle_brand->name : null,
+                        'model' => $vehicle->vehicle_model ? $vehicle->vehicle_model->name : null,
+                        'active' => $vehicle->active,
+                    ]
+                ]
+            ], 201);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error en registerDriverVehicle: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'Error al registrar vehículo: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * APROBAR CONDUCTOR
+     * Admin aprueba conductor y envía notificación WhatsApp
+     */
+    public function approveDriver(Request $request)
+    {
+        try {
+            $validator = \Validator::make($request->all(), [
+                'driver_id' => 'required|exists:drivers,id',
+            ]);
+            
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Datos inválidos',
+                    'errors' => $validator->errors()
+                ], 400);
+            }
+            
+            $driver = \App\Driver::find($request->driver_id);
+            
+            if (!$driver) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Conductor no encontrado'
+                ], 404);
+            }
+            
+            // Verificar si ya está aprobado
+            if ($driver->approved == 1) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'El conductor ya fue aprobado anteriormente'
+                ], 400);
+            }
+            
+            // Aprobar conductor
+            $driver->approved = 1;
+            $driver->active = 1; // Activar conductor
+            $driver->approved_at = now();
+            // 30 días gratis desde hoy
+            $driver->free_trial_until = date('Y-m-d', strtotime('+30 days'));
+            $driver->save();
+            
+            \Log::info("Conductor aprobado: ID {$driver->id}, Celular: {$driver->cellphone}");
+            
+            // Enviar notificación WhatsApp
+            $this->sendWhatsAppApprovalNotification($driver);
+            
+            return response()->json([
+                'status' => true,
+                'message' => 'Conductor aprobado exitosamente',
+                'data' => [
+                    'driver' => [
+                        'id' => $driver->id,
+                        'name' => $driver->first_name . ' ' . $driver->last_name,
+                        'cellphone' => $driver->cellphone,
+                        'approved' => $driver->approved,
+                        'approved_at' => $driver->approved_at,
+                        'free_trial_until' => $driver->free_trial_until,
+                    ]
+                ]
+            ], 200);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error en approveDriver: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'Error al aprobar conductor: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Enviar notificación WhatsApp al conductor aprobado
+     */
+    private function sendWhatsAppApprovalNotification($driver)
+    {
+        try {
+            $phone = $driver->cellphone;
+            
+            // Formatear número (formato internacional)
+            // Bolivia: +591 + número (sin 0 al inicio)
+            $formattedPhone = '591' . ltrim($phone, '0');
+            
+            $message = "¡Felicidades! 🎉\n\n";
+            $message .= "Tu registro como conductor en AnDre ha sido *aprobado*.\n\n";
+            $message .= "✅ Ya puedes comenzar a recibir viajes\n";
+            $message .= "🎁 Tienes *30 días GRATIS* para usar la aplicación\n";
+            $message .= "📅 Vencimiento: " . date('d/m/Y', strtotime($driver->free_trial_until)) . "\n\n";
+            $message .= "Descarga la app y comienza a ganar dinero hoy mismo.\n\n";
+            $message .= "¡Bienvenido a AnDre! 🚗💚";
+            
+            // Configuración WhatsApp API
+            $apiUrl = env('WHATSAPP_API_URL', 'https://api.whatsapp.com/send');
+            $apiToken = env('WHATSAPP_API_TOKEN', '');
+            $apiPhone = env('WHATSAPP_API_PHONE', ''); // Número de WhatsApp Business
+            
+            // Si está configurado, usar API de WhatsApp Business
+            if (!empty($apiToken) && !empty($apiUrl)) {
+                $response = \Http::withHeaders([
+                    'Authorization' => 'Bearer ' . $apiToken,
+                    'Content-Type' => 'application/json',
+                ])->post($apiUrl, [
+                    'phone' => $formattedPhone,
+                    'message' => $message,
+                ]);
+                
+                \Log::info("WhatsApp enviado a {$formattedPhone}: " . $response->body());
+            } else {
+                // Log si no está configurado
+                \Log::warning("WhatsApp API no configurada. Mensaje no enviado a {$formattedPhone}");
+                \Log::info("Mensaje que se enviaría:\n{$message}");
+            }
+            
+        } catch (\Exception $e) {
+            \Log::error('Error enviando WhatsApp: ' . $e->getMessage());
+            // No lanzar excepción para no bloquear la aprobación
+        }
+    }
+    
+    /**
+     * ACTUALIZACIÓN MENSUAL DE FOTO FACIAL
+     * POST /api-auth/update-facial-photo
+     */
+    public function updateFacialPhoto(Request $request)
+    {
+        $validator = \Validator::make($request->all(), [
+            'driver_id' => 'required|exists:drivers,id',
+            'photo' => 'required|string', // Base64 de la nueva foto
+        ]);
+        
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Datos inválidos',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+        
+        $driverId = $request->driver_id;
+        $driver = \App\Driver::find($driverId);
+        
+        if (!$driver) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Conductor no encontrado'
+            ], 404);
+        }
+        
+        try {
+            // Guardar la nueva foto
+            $photoPath = $this->saveBase64Image($request->photo, 'drivers/facial_photos');
+            
+            if (!$photoPath) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Error al procesar la imagen'
+                ], 400);
+            }
+            
+            // Actualizar foto y fecha
+            $driver->image = $photoPath;
+            $driver->facial_photo_updated_at = now();
+            $driver->facial_photo_blocked = 0; // Desbloquear si estaba bloqueado
+            $driver->save();
+            
+            \Log::info("Foto facial actualizada: Conductor ID {$driver->id}");
+            
+            return response()->json([
+                'status' => true,
+                'message' => 'Foto actualizada exitosamente',
+                'data' => [
+                    'driver' => [
+                        'id' => $driver->id,
+                        'image' => url($driver->image),
+                        'facial_photo_updated_at' => $driver->facial_photo_updated_at,
+                        'facial_photo_blocked' => $driver->facial_photo_blocked,
+                        'next_update_date' => date('Y-m-d', strtotime($driver->facial_photo_updated_at . ' +30 days')),
+                    ]
+                ]
+            ], 200);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error al actualizar foto facial: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'Error al actualizar foto: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Verificar estado de actualización de foto facial
+     * Retorna: needs_update (bool), days_remaining (int), blocked (bool)
+     */
+    private function checkFacialPhotoStatus($driver)
+    {
+        $lastUpdate = $driver->facial_photo_updated_at;
+        $isBlocked = $driver->facial_photo_blocked == 1;
+        
+        // Si no tiene fecha de actualización, considerar la fecha de registro
+        if (!$lastUpdate && $driver->created_at) {
+            $lastUpdate = $driver->created_at;
+            // Actualizar el campo para futuros checks
+            $driver->facial_photo_updated_at = $driver->created_at;
+            $driver->save();
+        }
+        
+        // Si aún no tiene fecha, es nueva cuenta sin foto
+        if (!$lastUpdate) {
+            return [
+                'needs_update' => true,
+                'is_expired' => true,
+                'days_remaining' => 0,
+                'blocked' => false,
+                'next_update_date' => null,
+                'message' => 'Debes subir tu foto de perfil'
+            ];
+        }
+        
+        // Calcular días desde la última actualización
+        $lastUpdateDate = new \DateTime($lastUpdate);
+        $now = new \DateTime();
+        $daysSinceUpdate = $now->diff($lastUpdateDate)->days;
+        
+        // 30 días = plazo total
+        // 25 días = enviar recordatorio (5 días antes)
+        // 30+ días = bloquear
+        
+        $daysRemaining = 30 - $daysSinceUpdate;
+        $needsUpdate = $daysSinceUpdate >= 25; // Mostrar aviso desde el día 25
+        $isExpired = $daysSinceUpdate >= 30;
+        $nextUpdateDate = date('Y-m-d', strtotime($lastUpdate . ' +30 days'));
+        
+        // Auto-bloquear si ha pasado más de 30 días
+        if ($isExpired && !$isBlocked) {
+            $driver->facial_photo_blocked = 1;
+            $driver->save();
+            $isBlocked = true;
+            
+            // Enviar notificación de bloqueo
+            $this->sendFacialPhotoBlockedNotification($driver);
+        }
+        
+        // Enviar recordatorio si está a 5 días o menos
+        if ($needsUpdate && !$isExpired && $daysSinceUpdate == 25) {
+            $this->sendFacialPhotoReminderNotification($driver, $daysRemaining);
+        }
+        
+        $message = '';
+        if ($isBlocked) {
+            $message = 'Tu cuenta está bloqueada. Actualiza tu foto para continuar.';
+        } elseif ($isExpired) {
+            $message = 'Tu foto de perfil ha vencido. Actualízala para continuar.';
+        } elseif ($needsUpdate) {
+            $message = "Tu foto vence en {$daysRemaining} días. No olvides actualizarla.";
+        } else {
+            $message = 'Tu foto está actualizada.';
+        }
+        
+        return [
+            'needs_update' => $needsUpdate,
+            'is_expired' => $isExpired,
+            'days_remaining' => max(0, $daysRemaining),
+            'blocked' => $isBlocked,
+            'next_update_date' => $nextUpdateDate,
+            'last_update_date' => $lastUpdate,
+            'message' => $message
+        ];
+    }
+    
+    /**
+     * Enviar notificación de recordatorio (5 días antes)
+     */
+    private function sendFacialPhotoReminderNotification($driver, $daysRemaining)
+    {
+        try {
+            $phone = $driver->cellphone ?? $driver->phone;
+            if (!$phone) {
+                \Log::warning("Conductor {$driver->id} no tiene teléfono registrado");
+                return;
+            }
+            
+            // Formatear teléfono para Bolivia (+591)
+            $formattedPhone = '591' . ltrim($phone, '0');
+            
+            $message = "📸 *Recordatorio AnDre* 📸\n\n";
+            $message .= "Hola {$driver->first_name},\n\n";
+            $message .= "Te recordamos que tu *foto de perfil* vence en *{$daysRemaining} días*.\n\n";
+            $message .= "⚠️ Si no la actualizas, tu cuenta será bloqueada temporalmente.\n\n";
+            $message .= "📱 Abre la app y actualiza tu foto ahora.\n\n";
+            $message .= "¡Gracias por ser parte de AnDre! 🚗💚";
+            
+            // Verificar si WhatsApp API está configurado
+            $apiUrl = env('WHATSAPP_API_URL');
+            $apiToken = env('WHATSAPP_API_TOKEN');
+            
+            if (!$apiUrl || !$apiToken) {
+                \Log::info("WhatsApp API no configurada. Mensaje de recordatorio: {$message}");
+                return;
+            }
+            
+            $response = \Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiToken,
+                'Content-Type' => 'application/json',
+            ])->post($apiUrl, [
+                'phone' => $formattedPhone,
+                'message' => $message,
+            ]);
+            
+            if ($response->successful()) {
+                \Log::info("Recordatorio de foto enviado a {$formattedPhone}");
+            } else {
+                \Log::error("Error al enviar recordatorio de foto: " . $response->body());
+            }
+            
+        } catch (\Exception $e) {
+            \Log::error('Error al enviar recordatorio de foto por WhatsApp: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Enviar notificación de bloqueo por foto vencida
+     */
+    private function sendFacialPhotoBlockedNotification($driver)
+    {
+        try {
+            $phone = $driver->cellphone ?? $driver->phone;
+            if (!$phone) {
+                return;
+            }
+            
+            $formattedPhone = '591' . ltrim($phone, '0');
+            
+            $message = "🚫 *Cuenta Bloqueada - AnDre* 🚫\n\n";
+            $message .= "Hola {$driver->first_name},\n\n";
+            $message .= "Tu cuenta ha sido *bloqueada temporalmente* porque tu foto de perfil ha vencido.\n\n";
+            $message .= "📸 Para desbloquear tu cuenta:\n";
+            $message .= "1. Abre la app AnDre Conductor\n";
+            $message .= "2. Actualiza tu foto de perfil\n";
+            $message .= "3. Continúa recibiendo viajes\n\n";
+            $message .= "⚠️ Este proceso es obligatorio cada 30 días por seguridad.\n\n";
+            $message .= "📞 ¿Problemas? Contáctanos.";
+            
+            $apiUrl = env('WHATSAPP_API_URL');
+            $apiToken = env('WHATSAPP_API_TOKEN');
+            
+            if (!$apiUrl || !$apiToken) {
+                \Log::info("WhatsApp API no configurada. Mensaje de bloqueo: {$message}");
+                return;
+            }
+            
+            $response = \Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiToken,
+                'Content-Type' => 'application/json',
+            ])->post($apiUrl, [
+                'phone' => $formattedPhone,
+                'message' => $message,
+            ]);
+            
+            if ($response->successful()) {
+                \Log::info("Notificación de bloqueo enviada a {$formattedPhone}");
+            }
+            
+        } catch (\Exception $e) {
+            \Log::error('Error al enviar notificación de bloqueo por WhatsApp: ' . $e->getMessage());
+        }
+    }
+
+}

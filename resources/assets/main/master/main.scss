@@ -1,0 +1,26 @@
+/* Global Texts */
+label { font-size: 20px !important; font-weight: bold; color: $second-color; }
+.mt-checkbox>span, .mt-radio>span { background-color: #cacaca; }
+.mt-checkbox:hover>input:not([disabled])~span, .mt-checkbox>input:focus~span, .mt-radio:hover>input:not([disabled])~span, 
+	.mt-radio>input:focus~span { background: $second-color; }
+.btn { font-size: 20px; line-height: 20px; }
+.form-control { height: 45px; font-size: 20px; color: $second-color; }
+.mt-checkbox>span, .mt-radio>span { top: 10px; }
+.mt-radio-inline label.mt-radio, .mt-checkbox-inline label.mt-checkbox { color: #777; font-weight: normal }
+h1, h2, h3, h4, h5, h6 { font-family: $font-title !important; color: $primary-color; text-transform: none; font-weight: 800; }
+h1 { font-size: 45px; }
+a { color: $primary-color; text-decoration: none; }
+a:hover { color: $second-color; }
+.fr-view { color: #000; }
+.navbar-inverse .navbar-nav > .active > a, .navbar-inverse .navbar-nav > .active > a:hover, 
+	.navbar-inverse .navbar-nav > .active > a:focus { background: #000; }
+
+
+
+		.m-header-menu .m-menu__nav>.m-menu__item.m-menu__item--tabs>.m-menu__submenu>.m-menu__subnav>.m-menu__item>.m-menu__link .m-menu__link-text{
+			color: #000 !important;
+		}
+
+
+		
+

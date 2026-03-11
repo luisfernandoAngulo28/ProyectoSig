@@ -1,0 +1,209 @@
+//------ IVRC------//
+body.admin-site-2 {
+	//------ Global Classes------//
+	.primary {
+		color: $primary-color !important;
+	}
+	.secondary {
+		color: $second-color !important;
+	}
+	.bg-primary {
+		background-color: $primary-color !important;
+	}
+	.bg-secondary {
+		background-color: $second-color !important;
+	}
+	.alert-primary{
+		color: $primary-color !important;
+		background: rgba($color: $primary-color, $alpha: .06) !important;
+	}
+	.alert-secondary{
+		color: $second-color !important;
+		background: rgba($color: $second-color, $alpha: .06) !important;
+	}
+	.badge-primary {
+		background-color: $primary-color;
+	}
+	.badge-secondary {
+		background-color: $second-color;
+	}
+	.popover {
+		border: 1px solid $second-color;
+		.popover-header {
+			background-color: $second-color;
+			&::before {
+				border-bottom: 1px solid $second-color;
+			}
+		}
+		&.bs-popover-bottom .arrow:after {
+			border-bottom-color: $second-color;
+		}
+	}
+	//------ Components------//
+	h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
+		color: $second-color;
+	}
+	a {
+		color: $primary-color;
+	}
+	.content {
+		text-align: inherit;
+	}
+	.btn-primary, .btn-secondary, .btn-warning, .btn-success,
+	.badge-primary, .badge-secondary, .badge-warning, .badge-success {
+		font-weight: 600;
+	}
+	.btn-primary {
+		// background: linear-gradient(
+		// 	90deg,
+		// 	$second-color 25%,
+		// 	$third-color 60%
+		// ) 0/ 200%;
+		// transition: .6s;
+		background-color: $second-color !important;
+		// &:hover {
+		// 	background: linear-gradient(
+		// 		122deg,
+		// 		$second-color 25%,
+		// 		$third-color 60%
+		// 	) 80%/ 200%;
+		// }
+	}
+	.btn-secondary {
+		background-color: $primary-color !important;
+	}
+	.progress {
+		&.progress-bar-secondary{
+			.progress-bar {
+				background-color: $primary-color;
+			}
+		}
+		&.progress.progress-xl {
+			height: 1.8rem;
+		}
+		.progress-bar {
+			height: auto;
+		}
+	}
+	.table {
+		text-align: inherit;
+		.table-header {
+			color: $primary-color;
+			font-weight: 600;
+		}
+	}
+	//------ Login------//
+	.bg-authentication {
+		background: linear-gradient(
+			90deg,
+			$primary-color,
+			$fourth-color
+		);
+		width: 100%;
+	}
+	//------ Menu------//
+	.main-menu {
+		.navbar-header {
+			width: 220px;
+			height: 8rem;
+			padding: 1rem;
+		}
+		.shadow-bottom {
+			background: linear-gradient(
+				rgba($color: $primary-color, $alpha: .70) 41%, 
+				rgba($color: $primary-color, $alpha: .50) 95%, 
+				rgba($color: $primary-color, $alpha: .20))
+			;
+		}
+		&.menu-dark{
+			background: $primary-color;
+			.navigation {
+				background: transparent;
+				li {
+					ul {
+						background: transparent;
+					}
+					&.sidebar-group-active > a {
+						background: $fourth-color;
+					}
+					&.open > a {
+						background: $fourth-color;
+						color: #fff;
+					}
+				}
+			}
+		}
+	}
+	.main-menu.menu-dark .navigation > li.active > a {
+		background: linear-gradient(
+			90deg,
+			$second-color 25%,
+			$third-color 60%
+		) 0/ 200%;
+		transition: .6s;
+		box-shadow: 0 0 6px 1px rgba($color: $second-color, $alpha: .46);
+		&:hover {
+			background: linear-gradient(
+				122deg,
+				$second-color 25%,
+				$third-color 60%
+			) 80%/ 200%;
+		}
+	}
+	//------ Header------//
+	// .header-navbar .navbar-container ul.nav li.dropdown-user .dropdown-menu-right {
+	// 	padding: .5rem 0;
+	// 	padding-top: 0;
+	// }
+	.header-navbar .navbar-container .dropdown-menu-media .dropdown-menu-header {
+		border-radius: 6px 6px 0 0;
+		background: $primary-color;
+	}
+	// .dropdown .dropdown-menu::before {
+	// 	background: $primary-color;
+	// }
+	//------ Tables------//
+	.admin-table {
+		tr.child {
+			td.child {
+				text-align: center;
+			}
+		}
+		thead .sorting:after, thead .sorting_desc:after, .sorting_asc:after {
+			content: '\e842';
+			font-family: 'feather';
+			position: initial;
+		}
+		thead {
+			.sorting:after, .sorting:before, .sorting_desc:after, .sorting_desc:before, .sorting_asc:after, .sorting_asc:before  {
+				display: none;
+			}
+		}
+	}
+	//------ Header- Dropdown------//
+	.dropdown-notification .dropdown-menu.dropdown-menu-right::before {
+		border-color: $primary-color;
+		background: $primary-color;
+	}
+	.dataTables_length {
+		label {
+			display: block;
+		}
+	}
+	#general-list {
+		.title {
+			background: $primary-color;
+			color: #fff;
+		}
+	}
+	//------ Forms------//
+	.vs-checkbox-primary input:checked ~ .vs-checkbox {
+		border-color: $second-color !important;
+	}
+	.vs-checkbox-primary input:checked ~ .vs-checkbox .vs-checkbox--check {
+		background-color: $second-color !important;
+	}
+	select.form-control:not([multiple='multiple']){
+		background-image: url(../../../assets/admin/img/arrow-down.png);
+	}
+}

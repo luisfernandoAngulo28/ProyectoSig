@@ -1,0 +1,35 @@
+//
+// Search Results
+// --------------------------------------------------
+
+
+// Base styles
+// --------------------------------------------------
+
+.rd-search-results{
+  padding-left: 30px;
+}
+
+.search_list{
+  text-align: left;
+  padding-left: 0;
+  font-size: 14px;
+  list-style-type: none;
+}
+
+.result-item{
+  list-style-type: decimal;
+
+  @media (min-width: $screen-sm-min) {
+    padding-left: 30px;
+  }
+}
+
+.search_title { margin-bottom: 6px; }
+
+.result-item + .result-item{ margin-top: 25px; }
+
+.match{
+  text-transform: uppercase;
+  color: $brand-primary
+}

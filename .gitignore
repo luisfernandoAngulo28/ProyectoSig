@@ -1,0 +1,11 @@
+/.sass-cache
+/vendor
+/node_modules
+/public/build
+/public/storage
+/public/tmp
+/storage/debugbar
+/storage/fonts
+Homestead.yaml
+composer.lock
+.env

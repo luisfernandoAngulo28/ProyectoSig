@@ -1,0 +1,247 @@
+/*
+* Navbar components
+*/
+
+// RD Navbar
+.rd-navbar {
+  display: none;
+  background: $navbar-background;
+  box-shadow: $navbar-shadow;
+}
+
+// RD Navbar Toggle
+.rd-navbar-toggle {
+  @include make-toggle(
+          $navbar-toggle-preset,
+          $navbar-min-line-height,
+          $navbar-min-font-size,
+          $white
+  );
+  background-color: transparent;
+  border: none;
+  &:focus{
+    outline: none;
+  }
+  display: none;
+}
+
+// RD Navbar Brand
+.rd-navbar-brand {
+  font-family: $font-family-cursive;
+  text-transform: uppercase;
+
+  font-size: 30px;
+  line-height: 50px;
+  .brand-name {
+    color: $white;
+    border:4px solid $white;
+    padding: 5px 12px 5px 23px;
+  }
+
+  .brand-slogan {
+    padding-left: 18px;
+    color:$brand-primary;
+  }
+}
+// RD Navbar Nav
+.rd-navbar-nav {
+}
+
+// RD Navbar Dropdown
+.rd-navbar-dropdown {
+  display: none;
+}
+
+// RD Navbar Search
+.rd-navbar-search {
+  &-toggle {
+    display: inline-block;
+    font: 400 18px/36px "FontAwesome";
+
+    &, &:before, &:after {
+      text-align: center;
+      width: 36px;
+      height: 36px;
+    }
+
+    &:before, &:after {
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+
+    &:before {
+      content: '\f002';
+      transition: .3s all ease;
+      @include transform(scale(1) rotate(0deg));
+    }
+
+    .rd-navbar:not(.rd-navbar-fixed) & {
+      &:after {
+        content: '\f00d';
+        transition: .3s all ease;
+        @include transform(scale(0) rotate(-90deg));
+      }
+
+      &.active {
+        &:before {
+          @include transform(scale(0) rotate(90deg));
+        }
+
+        &:after {
+          @include transform(scale(1) rotate(0deg));
+        }
+      }
+    }
+
+    .rd-navbar-fixed &, .rd-navbar-fixed &:before {
+      width: 48px;
+      line-height: 48px;
+    }
+  }
+
+  &-form-submit {
+    @include make-toggle(
+            $navbar-search-toggle-preset,
+            $navbar-min-line-height,
+            $navbar-min-font-size,
+            $navbar-panel-color
+    );
+  }
+}
+
+// RD Navbar Live Search Results
+.rd-navbar-live-search-results {
+  position: absolute;
+  left: 0;
+  right: 0;
+  @media (min-width: $screen-xs-min) {
+    width: 250px;
+  }
+  width: 175px;
+  @media (min-width: $screen-lg-min) {
+    width: 270px;
+  }
+  padding: 16px 8px 8px;
+  top: 110%;
+  font-size: 16px;
+  line-height: 20px;
+  color: #333;
+  background: #FFF;
+  box-shadow: $navbar-shadow;
+  opacity: 0;
+  visibility: hidden;
+  text-align: left;
+  z-index: 998;
+
+  .search-quick-result {
+    padding-left: 8px;
+    font-size: 14px;
+    line-height: 20px;
+    color: #757575;
+  }
+
+  .search_list {
+    margin-top: 4px;
+    font-size: 16px;
+    line-height: 20px;
+
+    li + li {
+      margin-top: 2px;
+    }
+
+    .search_list li + li:last-child {
+      margin-top: 8px;
+      border-top: 1px solid #EBEBEB;
+      padding-top: 7px;
+    }
+  }
+
+  .search_link {
+    display: block;
+    padding: 8px;
+    color: #757575;
+    border-radius: 2px;
+
+    &:hover {
+      background: #F7F7F7;
+    }
+
+    p {
+      margin-top: 0;
+      font-size: 14px;
+      display: none;
+    }
+  }
+
+  .search_title {
+    color: #212121;
+    font-weight: 400;
+  }
+
+  .search_submit {
+    display: block;
+    text-align: center;
+    padding: 8px;
+    font-weight: 700;
+    color: $brand-primary;
+    text-transform: uppercase;
+    -webkit-border-radius: 2px;
+    -moz-border-radius: 2px;
+    border-radius: 2px;
+
+    &:hover {
+      background: #F7F7F7;
+    }
+  }
+
+  &.active.not-empty {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  @media (min-width: $screen-lg-min) {
+    .search_link {
+      p {
+        display: block;
+      }
+    }
+  }
+}
+.rd-navbar-search-results {
+  margin-top: 30px;
+  .search_error {
+    overflow: hidden;
+    max-width: 100%;
+    text-overflow: ellipsis;
+  }
+}
+
+.rd-navbar-live-search-results {
+  @include transform(translateY(0%));
+
+  &.active {
+    @include transform(translateY(0));
+  }
+}
+
+// Rd navbar shop
+
+.rd-navbar-shop{
+  display: inline-block;
+  font-size: 22px;
+  color: $white;
+  position: absolute;
+  right: 12px;
+  @include transform(translateY(-50%));
+  top: 50%;
+  z-index: 9;
+  transition: .3s;
+  &:hover{
+    color: $brand-primary;
+  }
+  &:focus{
+    outline: 0;
+    color: $brand-primary;
+  }
+}

@@ -1,0 +1,67 @@
+/*
+* Fullwidth Layout
+*/
+
+$navbar-fullwidth-nav-color: $navbar-nav-color;
+$navbar-fullwidth-nav-background: $navbar-nav-background;
+$navbar-fullwidth-nav-hover-color: $navbar-nav-hover-color;
+$navbar-fullwidth-nav-hover-background: $navbar-nav-hover-background;
+$navbar-fullwidth-nav-active-color: $navbar-nav-active-color;
+$navbar-fullwidth-nav-active-background: $navbar-nav-active-background;
+
+.rd-navbar-fullwidth {
+  display: block;
+
+  // RD Navbar Panel
+  .rd-navbar-panel{
+    text-align: center;
+    padding: 24px 0;
+  }
+
+  .rd-navbar-nav-wrap{
+    position: relative;
+    padding-bottom: 5px;
+
+    .rd-navbar-megamenu{
+      left: 0;
+      right: 0;
+    }
+  }
+
+  .rd-navbar-search-toggle{
+    right: 6%;
+  }
+
+  // RD Navbar Nav
+  .rd-navbar-nav {
+    width: 100%;
+    display: table;
+
+    > li {
+      display: table-cell;
+
+      > a {
+        display: block;
+        text-align: center;
+        padding: 10px;
+      }
+    }
+  }
+
+  // RD Navbar States
+  &.rd-navbar--is-stuck {
+    @include transform(translateY(-120px));
+
+    .rd-navbar-panel{
+      display: block;
+    }
+  }
+
+  .rd-navbar-fullwidth--visible{
+    display: block;
+  }
+
+  .rd-navbar-fullwidth--hidden{
+    display: none;
+  }
+}

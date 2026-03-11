@@ -1,0 +1,128 @@
+@import "compass/css3";
+
+@import url(http://fonts.googleapis.com/css?family=Gudea:400,400italic,700);
+@import url(https://fonts.googleapis.com/css?family=Raleway:400,100,100italic,200,300,200italic,300italic,400italic,500,500italic,600,600italic,700,700italic,800,800italic,900,900italic&subset=latin,latin-ext);
+@import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap');
+/*====================================*/
+
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap');
+
+
+@font-face{
+  font-family:"Ionicons";
+  src:url("../../../assets/fonts/ionicons.eot?v=2.0.0");
+  src:url("../../../assets/fonts/ionicons.eot?v=2.0.0#iefix") format("embedded-opentype"),
+      url("../../../assets/fonts/ionicons.ttf?v=2.0.0") format("truetype"),
+      url("../../../assets/fonts/ionicons.woff?v=2.0.0") format("woff"),
+      url("../../../assets/fonts/ionicons.svg?v=2.0.0#Ionicons") format("svg");
+  font-weight:normal;
+  font-style:normal
+}
+
+
+@font-face{
+  font-family:'FontAwesome';
+  src:url('../../../assets/fonts/fontawesome-webfont.eot?v=4.7.0');
+  src:url('../../../assets/fonts/fontawesome-webfont.eot?#iefix&v=4.7.0') format('embedded-opentype'),
+      url('../../../assets/fonts/fontawesome-webfont.woff2?v=4.7.0') format('woff2'),
+      url('../../../assets/fonts/fontawesome-webfont.woff?v=4.7.0') format('woff'),
+      url('../../../assets/fonts/fontawesome-webfont.ttf?v=4.7.0') format('truetype'),
+      url('../../../assets/fonts/fontawesome-webfont.svg?v=4.7.0#fontawesomeregular') format('svg');
+  font-weight:normal;
+  font-style:normal
+}
+
+// General Variables
+$font-title: 'CenturyGothic', sans-serif;
+$font-subtext: 'CenturyGothic', sans-serif;
+$font-text: 'CenturyGothic', sans-serif;
+
+$primary-color: #44b7a9;
+$second-color:  #4edbca;
+$third-color: #ffffff;
+
+$background-color: #ffffff;
+$text-color: #000000;
+
+$admin-main-color: #44b7a9;
+$admin-second-color: #4edbca;
+$admin-third-color: #000000;
+$admin-light-color: #fff;
+
+@import "global/mixins";
+@import "global/main";
+@import "global/admin";
+
+body.admin-site-2 {
+  font-family: 'Lato';
+  
+  @import "subadmin/main";
+  @import "subadmin/responsive";
+}
+
+
+body.main-site { 
+  /*@import "master/main";
+  @import "master/responsive";
+  @import "segments/main";
+  @import "segments/responsive";*/
+  @import "project/main";
+  @import "project/responsive";
+
+}
+
+body.admin-site { 
+  @import "master/main";
+  @import "master/responsive";
+
+}
+
+body.admin-site-2 .app-content.content{
+  background-image: none;
+}
+
+body.admin-site-2 .bg-authentication {
+  background-color: #f8f8f8;
+}
+h1, h2, h3, h4, h5, h6 { color: $primary-color; }
+a:hover, a:focus, a:active { color: $second-color; }
+
+
+body.admin-site-2 table.table.admin-table tr td,
+body.admin-site-2 table.table.admin-table tr th,
+body.admin-site-2 table.table.admin-multilevel-table tr td,
+body.admin-site-2 table.table.admin-multilevel-table tr th {
+   background-color: #79d4ca19 !important;
+ }
+
+body.admin-site {
+  background: radial-gradient(circle, #ffffff, #bcbcbc);
+}
+
+.m-footer .m-footer__copyright {
+  color: #000;
+}
+
+body.admin-site-2 .main-menu .navigation-main li.hover {
+  filter: drop-shadow(2px 2px 4px rgba(78, 219, 203, 0.498));
+}
+
+body.admin-site-2 .bg-authentication img{
+      mix-blend-mode: multiply;
+}
+
+body.admin-site-2 .bg-authentication .divider{
+      display: none;
+}
+
+body.admin-site-2 .bg-authentication form .btn{
+      width: 100%;
+      margin-bottom: 16px;
+}
+
+@media screen and (max-width: 630px) {
+  body.admin-site-2 .bg-authentication .btn {
+      width: 100%;
+      margin-bottom: 16px;
+    }
+}

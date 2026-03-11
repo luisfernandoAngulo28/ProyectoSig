@@ -1,0 +1,1 @@
+{"version":3,"sources":["bootstrap-markdown.js"],"names":[],"mappings":"AAAA","file":"template-forms.js","sourcesContent":["var BootstrapMarkdown=function(){var n=function(){};return{init:function(){n()}}}();jQuery(document).ready(function(){BootstrapMarkdown.init()});"]}

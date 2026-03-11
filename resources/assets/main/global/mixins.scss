@@ -1,0 +1,28 @@
+@mixin border-radius($radius) {
+  -webkit-border-radius: $radius !important;
+     -moz-border-radius: $radius !important;
+      -ms-border-radius: $radius !important;
+          border-radius: $radius !important;
+}
+
+@mixin box-shadow($value) {
+  -webkit-box-shadow: $value;
+     -moz-box-shadow: $value;
+      -ms-box-shadow: $value;
+          box-shadow: $value;
+}
+
+@mixin transition($value) {
+  -webkit-transition: $value;
+     -moz-transition: $value;
+      -ms-transition: $value;
+          transition: $value;
+}
+
+@mixin background-gradient($value, $value2) {
+    background: $value; /* For browsers that do not support gradients */
+    background: -webkit-linear-gradient($value, $value2); /* For Safari 5.1 to 6.0 */
+    background: -o-linear-gradient($value, $value2); /* For Opera 11.1 to 12.0 */
+    background: -moz-linear-gradient($value, $value2); /* For Firefox 3.6 to 15 */
+    background: linear-gradient($value, $value2); /* Standard syntax */
+}
