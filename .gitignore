@@ -5,7 +5,10 @@
 /public/storage
 /public/tmp
 /storage/debugbar
+/storage/logs
 /storage/fonts
 Homestead.yaml
 composer.lock
 .env
+.env.production
+RDS_CONNECTION_INFO.md
