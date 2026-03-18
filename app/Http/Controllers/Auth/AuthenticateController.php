@@ -6,9 +6,11 @@ use Illuminate\Http\Request;
 
 use App\Http\Requests;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Validator;
 use JWTAuth;
 use Tymon\JWTAuth\Exceptions\JWTException;
 use App\Helpers\SpecialFunc;
+use App\Driver;
 
 class AuthenticateController extends Controller {
   
@@ -153,10 +155,10 @@ class AuthenticateController extends Controller {
      */
     public function sendOtpPhone(Request $request){
         $validator = \Validator::make($request->all(), [
-            'phone' => 'required|digits:9',
+            'phone' => 'required|digits_between:8,9',
         ],[
             'phone.required' => 'El campo teléfono es requerido.',
-            'phone.digits' => 'El teléfono debe tener 9 dígitos.',
+            'phone.digits_between' => 'El teléfono debe tener 8 o 9 dígitos.',
         ]);
         
         if ($validator->fails()) {
@@ -183,22 +185,24 @@ class AuthenticateController extends Controller {
             // Generar código OTP de 6 dígitos
             $otpCode = \Func::generateOTP(6);
             
-            // Crear registro OTP
-            $newOtp = new \App\Otp;
-            $newOtp->phone = $phone;
-            $newOtp->code = $otpCode;
-            $newOtp->type = 'phone';
-            $newOtp->time_expiration_code = time() + 600; // 10 minutos
-            $newOtp->parent_id = 0; // Usuario aún no creado
-            $newOtp->save();
+            // Crear registro OTP directamente con DB para evitar el observer de Solunes
+            // que consulta la tabla 'nodes' (que no existe en esta BD).
+            \DB::table('otps')->insert([
+                'phone'                => $phone,
+                'code'                 => $otpCode,
+                'type'                 => 'phone',
+                'time_expiration_code' => time() + 600, // 10 minutos
+                'parent_id'            => 0, // Usuario aún no creado
+                'created_at'           => date('Y-m-d H:i:s'),
+                'updated_at'           => date('Y-m-d H:i:s'),
+            ]);
             
-            // Enviar SMS con código OTP via Twilio
-            $smsMessage = "Tu código de verificación AnDre Taxi es: " . $otpCode . ". Válido por 10 minutos.";
-            $smsSent = $this->sendSMS($phone, $smsMessage);
-            
-            if (!$smsSent) {
-                \Log::warning("SMS could not be sent to: {$phone}, but OTP was saved.");
-                // Continuar aunque el SMS falle (útil para testing)
+            // Enviar OTP por canal configurado (whatsapp por defecto)
+            $otpMessage = "Tu código de verificación AnDre Taxi es: " . $otpCode . ". Válido por 10 minutos.";
+            $delivery = $this->sendOtpMessage($phone, $otpMessage);
+
+            if (!$delivery['sent']) {
+                \Log::warning("OTP could not be delivered to: {$phone}, but OTP was saved.");
             }
             
             return response()->json([
@@ -207,7 +211,9 @@ class AuthenticateController extends Controller {
                 'errors' => [],
                 'data' => [
                     'code' => $otpCode, // ⚠️ ELIMINAR EN PRODUCCIÓN - Solo para testing
-                    'expires_in' => 600 // 10 minutos
+                    'expires_in' => 600, // 10 minutos
+                    'delivery_channel' => $delivery['channel'],
+                    'message_sent' => $delivery['sent']
                 ]
             ], 200);
             
@@ -228,11 +234,11 @@ class AuthenticateController extends Controller {
      */
     public function verifyOtpPhone(Request $request){
         $validator = \Validator::make($request->all(), [
-            'phone' => 'required|digits:9',
+            'phone' => 'required|digits_between:8,9',
             'code' => 'required|digits:6',
         ],[
             'phone.required' => 'El campo teléfono es requerido.',
-            'phone.digits' => 'El teléfono debe tener 9 dígitos.',
+            'phone.digits_between' => 'El teléfono debe tener 8 o 9 dígitos.',
             'code.required' => 'El campo código es requerido.',
             'code.digits' => 'El código debe tener 6 dígitos.',
         ]);
@@ -309,14 +315,14 @@ class AuthenticateController extends Controller {
     public function registerWithPhone(Request $request){
         $validator = \Validator::make($request->all(), [
             'temp_token' => 'required',
-            'phone' => 'required|digits:9',
+            'phone' => 'required|digits_between:8,9',
             'name' => 'required|min:2',
             'gender' => 'required|in:male,female',
             'photo' => 'nullable|string',
         ],[
             'temp_token.required' => 'Token temporal requerido.',
             'phone.required' => 'El campo teléfono es requerido.',
-            'phone.digits' => 'El teléfono debe tener 9 dígitos.',
+            'phone.digits_between' => 'El teléfono debe tener 8 o 9 dígitos.',
             'name.required' => 'El campo nombre es requerido.',
             'name.min' => 'El nombre debe tener al menos 2 caracteres.',
             'gender.required' => 'El campo género es requerido.',
@@ -447,21 +453,198 @@ class AuthenticateController extends Controller {
             $client = new \Twilio\Rest\Client($sid, $token);
             
             // Enviar SMS
+            $countryCode = preg_replace('/\D+/', '', (string) env('SMS_COUNTRY_CODE', '591'));
+            if (empty($countryCode)) {
+                $countryCode = '591';
+            }
+
+            $normalizedPhone = $this->normalizePhoneDigits($phone);
+            $normalizedPhone = ltrim($normalizedPhone, '0');
+
             $client->messages->create(
-                '+51' . $phone, // Número de destino (Perú)
+                '+' . $countryCode . $normalizedPhone,
                 [
                     'from' => $twilioNumber,
                     'body' => $message
                 ]
             );
             
-            \Log::info("SMS sent successfully to: +51{$phone}");
+            \Log::info("SMS sent successfully to: +{$countryCode}{$normalizedPhone}");
             return true;
             
         } catch (\Exception $e) {
             \Log::error('Twilio SMS Error: ' . $e->getMessage());
             return false;
         }
+    }
+
+    private function normalizePhoneDigits($phone)
+    {
+        $digits = preg_replace('/\D+/', '', (string) $phone);
+
+        if ((strlen($digits) === 11 || strlen($digits) === 12) && strpos($digits, '591') === 0) {
+            $digits = substr($digits, 3);
+        }
+
+        return $digits;
+    }
+
+    private function verifyFirebasePhoneToken($firebaseToken, $expectedPhone)
+    {
+        try {
+            $apiKey = env('FIREBASE_WEB_API_KEY', '');
+            if (empty($apiKey)) {
+                return [
+                    'valid' => false,
+                    'message' => 'FIREBASE_WEB_API_KEY no configurada en el servidor.',
+                ];
+            }
+
+            $response = \Http::post(
+                'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' . $apiKey,
+                ['idToken' => $firebaseToken]
+            );
+
+            if (!$response->successful()) {
+                \Log::warning('Firebase token inválido: ' . $response->body());
+                return [
+                    'valid' => false,
+                    'message' => 'Token de Firebase inválido o expirado.',
+                ];
+            }
+
+            $payload = $response->json();
+            $firebasePhone = $payload['users'][0]['phoneNumber'] ?? null;
+
+            if (!$firebasePhone) {
+                return [
+                    'valid' => false,
+                    'message' => 'El token de Firebase no tiene teléfono asociado.',
+                ];
+            }
+
+            $expectedDigits = $this->normalizePhoneDigits($expectedPhone);
+            $firebaseDigits = $this->normalizePhoneDigits($firebasePhone);
+
+            if ($expectedDigits !== $firebaseDigits) {
+                return [
+                    'valid' => false,
+                    'message' => 'El teléfono verificado por Firebase no coincide.',
+                ];
+            }
+
+            return [
+                'valid' => true,
+                'phone' => $expectedDigits,
+            ];
+        } catch (\Exception $e) {
+            \Log::error('Error validando token Firebase: ' . $e->getMessage());
+            return [
+                'valid' => false,
+                'message' => 'No se pudo validar el token de Firebase.',
+            ];
+        }
+    }
+
+    private function sendWhatsAppMessage($phone, $message)
+    {
+        try {
+            $provider = strtolower((string) env('WHATSAPP_PROVIDER', 'twilio')); // twilio|generic
+            $apiUrl = env('WHATSAPP_API_URL');
+            $apiToken = env('WHATSAPP_API_TOKEN');
+
+            $countryCode = preg_replace('/\D+/', '', (string) env('SMS_COUNTRY_CODE', '591'));
+            if (empty($countryCode)) {
+                $countryCode = '591';
+            }
+
+            $normalizedPhone = ltrim($this->normalizePhoneDigits($phone), '0');
+            $formattedPhone = $countryCode . $normalizedPhone;
+
+            if ($provider === 'twilio') {
+                $sid = env('TWILIO_SID');
+                $token = env('TWILIO_AUTH_TOKEN');
+                $fromWhatsapp = env('WHATSAPP_FROM', 'whatsapp:+14155238886');
+
+                if (empty($sid) || empty($token)) {
+                    \Log::warning('Twilio WhatsApp no configurado: faltan TWILIO_SID/TWILIO_AUTH_TOKEN.');
+                    return false;
+                }
+
+                $twilioUrl = !empty($apiUrl)
+                    ? $apiUrl
+                    : 'https://api.twilio.com/2010-04-01/Accounts/' . $sid . '/Messages.json';
+
+                $response = \Http::asForm()
+                    ->withBasicAuth($sid, $token)
+                    ->post($twilioUrl, [
+                        'From' => $fromWhatsapp,
+                        'To' => 'whatsapp:+' . $formattedPhone,
+                        'Body' => $message,
+                    ]);
+
+                if (!$response->successful()) {
+                    \Log::warning('Twilio WhatsApp OTP falló para ' . $formattedPhone . ': ' . $response->body());
+                    return false;
+                }
+
+                \Log::info('Twilio WhatsApp OTP enviado a: ' . $formattedPhone);
+                return true;
+            }
+
+            if (empty($apiUrl) || empty($apiToken)) {
+                \Log::warning('WhatsApp API no configurada para envío OTP.');
+                return false;
+            }
+
+            $response = \Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiToken,
+                'Content-Type' => 'application/json',
+            ])->post($apiUrl, [
+                'phone' => $formattedPhone,
+                'message' => $message,
+            ]);
+
+            if (!$response->successful()) {
+                \Log::warning('WhatsApp OTP falló para ' . $formattedPhone . ': ' . $response->body());
+                return false;
+            }
+
+            \Log::info('WhatsApp OTP enviado a: ' . $formattedPhone);
+            return true;
+        } catch (\Exception $e) {
+            \Log::error('Error enviando OTP por WhatsApp: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    private function sendOtpMessage($phone, $message)
+    {
+        $channel = strtolower((string) env('OTP_CHANNEL', 'auto')); // firebase|whatsapp|sms|auto
+        $fallbackToSms = filter_var(env('OTP_FALLBACK_TO_SMS', 'true'), FILTER_VALIDATE_BOOLEAN);
+
+        // Firebase maneja el envío de SMS directamente desde la app móvil.
+        // El backend solo valida el token resultante. No necesita enviar nada.
+        if ($channel === 'firebase') {
+            return ['sent' => true, 'channel' => 'firebase'];
+        }
+
+        if ($channel === 'sms') {
+            $smsSent = $this->sendSMS($phone, $message);
+            return ['sent' => $smsSent, 'channel' => $smsSent ? 'sms' : 'none'];
+        }
+
+        $waSent = $this->sendWhatsAppMessage($phone, $message);
+        if ($waSent) {
+            return ['sent' => true, 'channel' => 'whatsapp'];
+        }
+
+        if (($channel === 'auto' || $channel === 'whatsapp') && $fallbackToSms) {
+            $smsSent = $this->sendSMS($phone, $message);
+            return ['sent' => $smsSent, 'channel' => $smsSent ? 'sms' : 'none'];
+        }
+
+        return ['sent' => false, 'channel' => 'none'];
     }
 
     // ==========================================
@@ -474,8 +657,11 @@ class AuthenticateController extends Controller {
      */
     public function sendOtpPhoneDriver(Request $request)
     {
+        $normalizedPhone = $this->normalizePhoneDigits($request->input('phone', ''));
+        $request->merge(['phone' => $normalizedPhone]);
+
         $validator = \Validator::make($request->all(), [
-            'phone' => 'required|digits:9',
+            'phone' => 'required|digits_between:8,9',
         ]);
         
         if ($validator->fails()) {
@@ -498,20 +684,23 @@ class AuthenticateController extends Controller {
         }
         
         // Generar código OTP de 6 dígitos
-        $code = \App\Func::generateOTP(6);
+        $code = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
         $expirationTime = time() + 600; // 10 minutos
         
-        // Guardar código en base de datos
-        $codeOtp = new \App\Otp;
-        $codeOtp->phone = $phone;
-        $codeOtp->code = $code;
-        $codeOtp->type = 'phone';
-        $codeOtp->time_expiration_code = $expirationTime;
-        $codeOtp->save();
+        // Guardar OTP sin disparar hooks de modelo que dependen de tablas no presentes.
+        \DB::table('otps')->insert([
+            'phone' => $phone,
+            'parent_id' => 0,
+            'code' => $code,
+            'type' => 'phone',
+            'time_expiration_code' => $expirationTime,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
         
-        // Enviar SMS con código
+        // Enviar OTP por canal configurado (whatsapp por defecto)
         $message = "Tu código de verificación AnDre Conductor es: {$code}";
-        $smsSent = $this->sendSMS($phone, $message);
+        $delivery = $this->sendOtpMessage($phone, $message);
         
         // Log para debugging
         \Log::info("OTP generado para conductor {$phone}: {$code}");
@@ -522,7 +711,8 @@ class AuthenticateController extends Controller {
             'data' => [
                 'code' => $code, // Solo para testing, remover en producción
                 'expires_in' => 600,
-                'sms_sent' => $smsSent
+                'delivery_channel' => $delivery['channel'],
+                'message_sent' => $delivery['sent']
             ]
         ], 200);
     }
@@ -533,9 +723,13 @@ class AuthenticateController extends Controller {
      */
     public function verifyOtpPhoneDriver(Request $request)
     {
+        $normalizedPhone = $this->normalizePhoneDigits($request->input('phone', ''));
+        $request->merge(['phone' => $normalizedPhone]);
+
         $validator = \Validator::make($request->all(), [
-            'phone' => 'required|digits:9',
-            'code' => 'required|digits:6',
+            'phone' => 'required|digits_between:8,9',
+            'code' => 'sometimes|digits:6',
+            'firebase_token' => 'sometimes|string',
         ]);
         
         if ($validator->fails()) {
@@ -547,10 +741,53 @@ class AuthenticateController extends Controller {
         }
         
         $phone = $request->phone;
-        $code = $request->code;
+        $code = $request->input('code');
+        $firebaseToken = $request->input('firebase_token');
+
+        if (empty($code) && empty($firebaseToken)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Debes enviar code o firebase_token'
+            ], 400);
+        }
+
+        if (!empty($firebaseToken)) {
+            $firebaseCheck = $this->verifyFirebasePhoneToken($firebaseToken, $phone);
+            if (!$firebaseCheck['valid']) {
+                return response()->json([
+                    'status' => false,
+                    'message' => $firebaseCheck['message'] ?? 'Token Firebase inválido',
+                ], 400);
+            }
+
+            // Generar token temporal para completar registro (válido por 30 minutos)
+            $tempToken = str_random(60);
+
+            \DB::table('otps')->insert([
+                'phone' => $phone,
+                'parent_id' => 0,
+                'code' => 'firebase',
+                'type' => 'phone',
+                'time_expiration_code' => time() + 1800,
+                'temp_token' => $tempToken,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Teléfono verificado con Firebase',
+                'data' => [
+                    'temp_token' => $tempToken,
+                    'phone' => $phone,
+                    'verified_by' => 'firebase',
+                ]
+            ], 200);
+        }
         
-        // Buscar el código en la base de datos
-        $codeOtpFind = \App\Otp::where('phone', $phone)
+        // Buscar OTP sin usar el modelo Eloquent para evitar hooks globales.
+        $codeOtpFind = \DB::table('otps')
+            ->where('phone', $phone)
             ->where('code', $code)
             ->where('type', 'phone')
             ->orderBy('created_at', 'desc')
@@ -573,8 +810,12 @@ class AuthenticateController extends Controller {
         
         // Generar token temporal para completar registro (válido por 30 minutos)
         $tempToken = str_random(60);
-        $codeOtpFind->temp_token = $tempToken;
-        $codeOtpFind->save();
+        \DB::table('otps')
+            ->where('id', $codeOtpFind->id)
+            ->update([
+                'temp_token' => $tempToken,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
         
         \Log::info("Código verificado para conductor {$phone}, token temporal: {$tempToken}");
         
@@ -596,7 +837,7 @@ class AuthenticateController extends Controller {
     {
         $validator = \Validator::make($request->all(), [
             'temp_token' => 'required',
-            'phone' => 'required|digits:9',
+            'phone' => 'required|digits_between:8,9',
             'name' => 'required|min:2',
             'email' => 'email', // Opcional: solo valida formato si se envía
             'gender' => 'required|in:male,female',
@@ -620,8 +861,9 @@ class AuthenticateController extends Controller {
         $gender = $request->gender;
         $companyType = $request->company_type;
         
-        // Verificar el token temporal
-        $codeOtp = \App\Otp::where('phone', $phone)
+        // Verificar el token temporal sin hooks del modelo.
+        $codeOtp = \DB::table('otps')
+            ->where('phone', $phone)
             ->where('temp_token', $tempToken)
             ->where('type', 'phone')
             ->orderBy('created_at', 'desc')
@@ -702,9 +944,13 @@ class AuthenticateController extends Controller {
         $driver->verified = 0; // Pendiente de verificación
         $driver->save();
         
-        // Vincular el OTP al conductor
-        $codeOtp->parent_id = $driver->id;
-        $codeOtp->save();
+        // Vincular el OTP al conductor sin usar el modelo Eloquent.
+        \DB::table('otps')
+            ->where('id', $codeOtp->id)
+            ->update([
+                'parent_id' => $driver->id,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
         
         \Log::info("Conductor registrado: ID {$driver->id}, Phone: {$phone}");
         
@@ -778,7 +1024,7 @@ class AuthenticateController extends Controller {
     {
         try {
             $validator = Validator::make($request->all(), [
-                'phone' => 'required|string|min:9|max:9',
+                'phone' => 'required|string|min:8|max:9',
             ]);
             
             if ($validator->fails()) {
@@ -811,14 +1057,15 @@ class AuthenticateController extends Controller {
             $otp->expiry = now()->addMinutes(10);
             $otp->save();
             
-            // Enviar SMS con Twilio
+            // Enviar OTP por canal configurado (whatsapp por defecto)
             $message = "Tu código de acceso AnDre es: {$code}. Válido por 10 minutos.";
-            $this->sendSMS($phone, $message);
+            $delivery = $this->sendOtpMessage($phone, $message);
             
             return response()->json([
                 'status' => true,
-                'message' => 'Código enviado a tu teléfono',
+                'message' => $delivery['channel'] === 'whatsapp' ? 'Código enviado a tu WhatsApp' : 'Código enviado a tu teléfono',
                 'code' => $code, // SOLO PARA TESTING, remover en producción
+                'delivery_channel' => $delivery['channel'],
             ], 200);
             
         } catch (\Exception $e) {
@@ -838,7 +1085,7 @@ class AuthenticateController extends Controller {
     {
         try {
             $validator = Validator::make($request->all(), [
-                'phone' => 'required|string|min:9|max:9',
+                'phone' => 'required|string|min:8|max:9',
                 'code' => 'required|string|size:6',
             ]);
             
@@ -915,8 +1162,11 @@ class AuthenticateController extends Controller {
     public function loginWithPhoneDriver(Request $request)
     {
         try {
+            $normalizedPhone = $this->normalizePhoneDigits($request->input('phone', ''));
+            $request->merge(['phone' => $normalizedPhone]);
+
             $validator = Validator::make($request->all(), [
-                'phone' => 'required|string|min:9|max:9',
+                'phone' => 'required|string|min:8|max:9',
             ]);
             
             if ($validator->fails()) {
@@ -929,7 +1179,7 @@ class AuthenticateController extends Controller {
             $phone = $request->phone;
             
             // Validar que el conductor EXISTA en la base de datos
-            $driver = Driver::where('phone', $phone)->first();
+            $driver = \App\Driver::where('cellphone', $phone)->first();
             
             if (!$driver) {
                 return response()->json([
@@ -949,22 +1199,26 @@ class AuthenticateController extends Controller {
             // Generar código OTP de 6 dígitos
             $code = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
             
-            // Guardar en tabla otp
-            $otp = new Otp();
-            $otp->parent_id = $driver->id;
-            $otp->code = $code;
-            $otp->type = 'phone_driver';
-            $otp->expiry = now()->addMinutes(10);
-            $otp->save();
+            // Guardar OTP sin hooks de modelo.
+            \DB::table('otps')->insert([
+                'parent_id' => $driver->id,
+                'phone' => $phone,
+                'code' => $code,
+                'type' => 'phone',
+                'time_expiration_code' => time() + 600,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
             
-            // Enviar SMS con Twilio
+            // Enviar OTP por canal configurado (whatsapp por defecto)
             $message = "Tu código de acceso AnDre Conductor es: {$code}. Válido por 10 minutos.";
-            $this->sendSMS($phone, $message);
+            $delivery = $this->sendOtpMessage($phone, $message);
             
             return response()->json([
                 'status' => true,
-                'message' => 'Código enviado a tu teléfono',
+                'message' => $delivery['channel'] === 'whatsapp' ? 'Código enviado a tu WhatsApp' : 'Código enviado a tu teléfono',
                 'code' => $code, // SOLO PARA TESTING, remover en producción
+                'delivery_channel' => $delivery['channel'],
             ], 200);
             
         } catch (\Exception $e) {
@@ -983,9 +1237,13 @@ class AuthenticateController extends Controller {
     public function loginVerifyPhoneDriver(Request $request)
     {
         try {
+            $normalizedPhone = $this->normalizePhoneDigits($request->input('phone', ''));
+            $request->merge(['phone' => $normalizedPhone]);
+
             $validator = Validator::make($request->all(), [
-                'phone' => 'required|string|min:9|max:9',
-                'code' => 'required|string|size:6',
+                'phone' => 'required|string|min:8|max:9',
+                'code' => 'sometimes|string|size:6',
+                'firebase_token' => 'sometimes|string',
             ]);
             
             if ($validator->fails()) {
@@ -996,10 +1254,18 @@ class AuthenticateController extends Controller {
             }
             
             $phone = $request->phone;
-            $code = $request->code;
+            $code = $request->input('code');
+            $firebaseToken = $request->input('firebase_token');
+
+            if (empty($code) && empty($firebaseToken)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Debes enviar code o firebase_token',
+                ], 400);
+            }
             
             // Buscar conductor
-            $driver = Driver::where('phone', $phone)->first();
+            $driver = \App\Driver::where('cellphone', $phone)->first();
             
             if (!$driver) {
                 return response()->json([
@@ -1016,23 +1282,33 @@ class AuthenticateController extends Controller {
                 ], 403);
             }
             
-            // Validar OTP
-            $otp = Otp::where('parent_id', $driver->id)
-                      ->where('code', $code)
-                      ->where('type', 'phone_driver')
-                      ->where('expiry', '>', now())
-                      ->orderBy('created_at', 'desc')
-                      ->first();
-            
-            if (!$otp) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'Código inválido o expirado',
-                ], 400);
+            if (!empty($firebaseToken)) {
+                $firebaseCheck = $this->verifyFirebasePhoneToken($firebaseToken, $phone);
+                if (!$firebaseCheck['valid']) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => $firebaseCheck['message'] ?? 'Token Firebase inválido',
+                    ], 400);
+                }
+            } else {
+                // Validar OTP legacy
+                $otp = Otp::where('parent_id', $driver->id)
+                          ->where('code', $code)
+                             ->where('type', 'phone')
+                             ->where('time_expiration_code', '>', time())
+                          ->orderBy('created_at', 'desc')
+                          ->first();
+                
+                if (!$otp) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => 'Código inválido o expirado',
+                    ], 400);
+                }
+                
+                // Eliminar OTP usado
+                $otp->delete();
             }
-            
-            // Eliminar OTP usado
-            $otp->delete();
             
             // Verificar estado de foto facial (actualización mensual)
             $facialPhotoStatus = $this->checkFacialPhotoStatus($driver);
