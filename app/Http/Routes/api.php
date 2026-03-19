@@ -27,16 +27,16 @@ Route::group(['prefix' => 'api-auth'], function(){
 	Route::post('login-with-phone-driver', 'Auth\AuthenticateController@loginWithPhoneDriver');
 	Route::post('login-verify-phone-driver', 'Auth\AuthenticateController@loginVerifyPhoneDriver');
 
-	// Endpoints para REGISTRO DE VEHÍCULO de conductor
-	Route::get('vehicle-brands', 'Auth\AuthenticateController@getVehicleBrands');
-	Route::get('vehicle-models', 'Auth\AuthenticateController@getVehicleModels');
-	Route::post('register-vehicle', 'Auth\AuthenticateController@registerDriverVehicle');
+	// Endpoints que requieren autenticación
+	Route::group(['middleware' => ['jwt.auth']], function(){
+		Route::get('vehicle-brands', 'Auth\AuthenticateController@getVehicleBrands');
+		Route::get('vehicle-models', 'Auth\AuthenticateController@getVehicleModels');
+		Route::post('register-vehicle', 'Auth\AuthenticateController@registerDriverVehicle');
+		Route::post('update-facial-photo', 'Auth\AuthenticateController@updateFacialPhoto');
+	});
 
 	// Endpoint para APROBAR CONDUCTOR (Admin)
 	Route::post('approve-driver', 'Auth\AuthenticateController@approveDriver');
-
-	// Endpoint para ACTUALIZACIÓN MENSUAL DE FOTO FACIAL
-	Route::post('update-facial-photo', 'Auth\AuthenticateController@updateFacialPhoto');
 
 });
 

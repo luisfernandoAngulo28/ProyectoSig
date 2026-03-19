@@ -1411,7 +1411,8 @@ class AuthenticateController extends Controller {
         try {
             $type_vehicle = $request->input('type_vehicle', 'auto'); // auto o moto
             
-            $brands = \App\VehicleBrand::where('active', 1)
+            // Usamos DB::table para evitar el error de count() en Eloquent Builder con PHP 7.4
+            $brands = \DB::table('vehicle_brands')->where('active', 1)
                 ->where('type_vehicle', $type_vehicle)
                 ->orderBy('name', 'asc')
                 ->get(['id', 'name', 'type_vehicle']);
@@ -1448,7 +1449,8 @@ class AuthenticateController extends Controller {
                 ], 400);
             }
 
-            $models = \App\VehicleModel::where('vehicle_brand_id', $brand_id)
+            // Usamos DB::table para evitar el error de count() en Eloquent Builder con PHP 7.4
+            $models = \DB::table('vehicle_models')->where('vehicle_brand_id', $brand_id)
                 ->where('active', 1)
                 ->orderBy('name', 'asc')
                 ->get(['id', 'name', 'vehicle_brand_id']);
@@ -1505,8 +1507,8 @@ class AuthenticateController extends Controller {
                 ], 404);
             }
 
-            // Verificar si ya tiene un vehículo activo
-            $existingVehicle = \App\DriverVehicle::where('parent_id', $driver->id)
+            // Verificar si ya tiene un vehículo activo (Usando DB::table para compatibilidad)
+            $existingVehicle = \DB::table('driver_vehicles')->where('parent_id', $driver->id)
                 ->where('active', 1)
                 ->first();
 
