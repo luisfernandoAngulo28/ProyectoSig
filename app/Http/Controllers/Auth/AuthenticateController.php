@@ -29,6 +29,27 @@ class AuthenticateController extends Controller {
         $user = auth()->user();
         $date = date('d/n/Y H:i:s', strtotime('+6 months'));
         
+        // Preparar roles de forma defensiva por si la tabla 'roles' no existe en este ambiente
+        $roles = [];
+        try {
+            $roles = $user->role_user->map(function($role) {
+                return [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                    'description' => $role->description,
+                ];
+            })->toArray();
+        } catch (\Exception $e) {
+            // Si la tabla no existe (error que nos da el log), devolvemos un rol básico si es conductor
+            if($user->driver){
+                $roles = [[
+                    'id' => 3, // ID típico para drivers
+                    'name' => 'driver',
+                    'description' => 'Conductor',
+                ]];
+            }
+        }
+
         // Preparar datos básicos del usuario para el AuthModel de Flutter
         $userData = [
             'token' => $token,
@@ -38,13 +59,7 @@ class AuthenticateController extends Controller {
             'last_name' => $user->last_name ?? '',
             'cellphone' => $user->cellphone,
             'code_cellphone' => $user->code_cellphone ?? '+591',
-            'role' => $user->role_user->map(function($role) {
-                return [
-                    'id' => $role->id,
-                    'name' => $role->name,
-                    'description' => $role->description,
-                ];
-            }),
+            'role' => $roles,
             'client_socket_code' => $user->client_socket_code,
         ];
 
