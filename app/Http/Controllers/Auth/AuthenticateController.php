@@ -1409,13 +1409,10 @@ class AuthenticateController extends Controller {
     public function getVehicleBrands(Request $request)
     {
         try {
-            $type_vehicle = $request->input('type_vehicle', 'auto'); // auto o moto
-            
-            // Usamos DB::table para evitar el error de count() en Eloquent Builder con PHP 7.4
+            // Quitamos el filtro de type_vehicle porque la columna no existe en la tabla vehicle_brands
             $brands = \DB::table('vehicle_brands')->where('active', 1)
-                ->where('type_vehicle', $type_vehicle)
                 ->orderBy('name', 'asc')
-                ->get(['id', 'name', 'type_vehicle']);
+                ->get(['id', 'name']);
 
             return response()->json([
                 'status' => true,
