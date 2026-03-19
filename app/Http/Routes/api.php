@@ -56,10 +56,13 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'App\\H
 	// Perfil de conductor (v1/drivers/{id})
 	Route::get('drivers/{id}', function($id){
 		try {
-			$driver = \App\Driver::where('user_id', $id)->first();
+			// Usamos DB::table para evitar el error de count() en Eloquent Builder
+			$driver = \DB::table('drivers')->where('id', $id)->orWhere('user_id', $id)->first();
+			
 			if(!$driver){
 				return response()->json(['status'=>false, 'message'=>'No se encontró el perfil de conductor.'], 404);
 			}
+
 			$data = [
 				'drivers_id' => $driver->id,
 				'user_id' => $driver->user_id,
@@ -72,32 +75,31 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'App\\H
 				'drivers_travel_with_pets' => (int)$driver->travel_with_pets,
 				'driver_rating_total' => '5.0', 
 				'rides_total' => '0',
-				'drivers_image' => $driver->image,
+				'drivers_image' => (strpos($driver->image, 'http') === 0) ? $driver->image : url($driver->image),
 				'qr_image' => $driver->qr_image,
 			];
 			
-			// Verificamos relación de vehículos
+			// Verificamos vehículos usando DB::table
 			$vehicles = [];
-			try {
-				$dvRel = $driver->driver_vehicles; // Usamos la relación correcta
-				if($dvRel){
-					foreach($dvRel as $dv){
-						$brand = $dv->vehicle_brand ? $dv->vehicle_brand->name : '';
-						$model = $dv->vehicle_model ? $dv->vehicle_model->name : '';
-						$vehicles[] = [
-							'id' => $dv->id,
-							'vehicle_name' => trim($brand . ' ' . $model) ?: 'Vehículo',
-							'plate' => $dv->number_plate ?: '',
-						];
-					}
-				}
-			} catch (\Exception $e_veh) {
-				\Log::info("Error obteniendo vehículos: ".$e_veh->getMessage());
+			$dvRel = \DB::table('driver_vehicles')->where('parent_id', $driver->id)->where('active', 1)->get();
+			foreach($dvRel as $dv){
+				$brand = \DB::table('vehicle_brands')->where('id', $dv->vehicle_brand_id)->first();
+				$model = \DB::table('vehicle_models')->where('id', $dv->vehicle_model_id)->first();
+				
+				$brName = $brand ? $brand->name : '';
+				$moName = $model ? $model->name : '';
+				
+				$vehicles[] = [
+					'id' => $dv->id,
+					'vehicle_name' => trim($brName . ' ' . $moName) ?: 'Vehículo',
+					'plate' => $dv->number_plate ?: '',
+				];
 			}
 			$data['driver_vehicles'] = $vehicles;
 			
 			return response()->json(['status'=>true, 'data'=>[$data]]);
 		} catch (\Exception $e) {
+			\Log::error("Error en v1/drivers/{id}: ".$e->getMessage());
 			return response()->json(['status'=>false, 'message'=>'Error obteniendo perfil: '.$e->getMessage()], 500);
 		}
 	});
@@ -114,18 +116,23 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'App\\H
 				}
 			}
 			
-			$driver = \App\Driver::where('user_id', $user->id)->first();
+			$driver = \DB::table('drivers')->where('user_id', $user->id)->first();
 			if(!$driver){
 				return response()->json(['status'=>false, 'message'=>'No se encontró el perfil de conductor.'], 404);
 			}
 			
-			$driver->active = ($request->input('active') || $request->input('active') === 'true' || $request->input('active') === 1) ? 1 : 0;
-			if($request->has('latitude')) $driver->latitude = $request->input('latitude');
-			if($request->has('longitude')) $driver->longitude = $request->input('longitude');
-			$driver->save();
+			$activeInput = $request->input('active');
+			$active = ($activeInput || $activeInput === 'true' || $activeInput == 1) ? 1 : 0;
 			
-			return response()->json(['status'=>true, 'message'=>'Estado actualizado correctamente.', 'active' => $driver->active]);
+			$updateData = ['active' => $active];
+			if($request->has('latitude')) $updateData['latitude'] = $request->input('latitude');
+			if($request->has('longitude')) $updateData['longitude'] = $request->input('longitude');
+			
+			\DB::table('drivers')->where('id', $driver->id)->update($updateData);
+			
+			return response()->json(['status'=>true, 'message'=>'Estado actualizado correctamente.', 'active' => (int)$active]);
 		} catch (\Exception $e) {
+			\Log::error("Error en v1/drivers/active: ".$e->getMessage());
 			return response()->json(['status'=>false, 'message'=>'Error de servidor: '.$e->getMessage()], 500);
 		}
     });
