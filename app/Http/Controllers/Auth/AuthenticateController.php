@@ -19,20 +19,46 @@ class AuthenticateController extends Controller {
         try {
             // verify the credentials and create a token for the user
             if (! $token = JWTAuth::attempt($credentials)) {
-                return response()->json(['error' => 'Su usuario y contraseña no coinciden.'], 401);
+                return response()->json(['status' => false, 'error' => 'Su usuario y contraseña no coinciden.'], 401);
             }
         } catch (JWTException $e) {
             // something went wrong
-            return response()->json(['error' => 'Hubo un error, vuelva a intentarlo.'], 500);
+            return response()->json(['status' => false, 'error' => 'Hubo un error, vuelva a intentarlo.'], 500);
         }
-        $date = date('d/n/Y H:i:s', strtotime('+6 months'));
-        $array = ['token'=>$token, 'expirationDate'=>$date];
+
         $user = auth()->user();
+        $date = date('d/n/Y H:i:s', strtotime('+6 months'));
+        
+        // Preparar datos básicos del usuario para el AuthModel de Flutter
+        $userData = [
+            'token' => $token,
+            'expirationDate' => $date,
+            'id' => $user->id,
+            'name' => $user->name,
+            'last_name' => $user->last_name ?? '',
+            'cellphone' => $user->cellphone,
+            'code_cellphone' => $user->code_cellphone ?? '+591',
+            'role' => $user->role_user->map(function($role) {
+                return [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                    'description' => $role->description,
+                ];
+            }),
+            'client_socket_code' => $user->client_socket_code,
+        ];
+
+        // Mezclar datos de conductor si existen
         if($driver = $user->driver){
-            $array = array_merge($array, \Func::get_deliveries($driver));
+            // \Func::get_deliveries($driver) suele devolver campos adicionales del conductor
+            $userData = array_merge($userData, \Func::get_deliveries($driver));
         }
-        // if no errors are encountered we can return a JWT
-        return response()->json($array, 200);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Inicio de sesión exitoso',
+            'data' => $userData
+        ], 200);
     }
 
 
