@@ -16,41 +16,50 @@ class AuthenticateController extends Controller {
   
     public function authenticate(Request $request) {
         $credentials = $request->only('email', 'password');
+        
         try {
-            // verify the credentials and create a token for the user
             if (! $token = JWTAuth::attempt($credentials)) {
                 return response()->json(['status' => false, 'error' => 'Su usuario y contraseña no coinciden.'], 401);
             }
         } catch (JWTException $e) {
-            // something went wrong
             return response()->json(['status' => false, 'error' => 'Hubo un error, vuelva a intentarlo.'], 500);
         }
 
         $user = auth()->user();
-        $date = date('d/n/Y H:i:s', strtotime('+6 months'));
-        
-        // Preparar roles de forma defensiva por si la tabla 'roles' no existe en este ambiente
-        $roles = [];
-        try {
-            $roles = $user->role_user->map(function($role) {
-                return [
-                    'id' => $role->id,
-                    'name' => $role->name,
-                    'description' => $role->description,
-                ];
-            })->toArray();
-        } catch (\Exception $e) {
-            // Si la tabla no existe (error que nos da el log), devolvemos un rol básico si es conductor
-            if($user->driver){
-                $roles = [[
-                    'id' => 3, // ID típico para drivers
-                    'name' => 'driver',
-                    'description' => 'Conductor',
-                ]];
-            }
+        if(!$user){
+             return response()->json(['status' => false, 'error' => 'Usuario no encontrado tras autenticación.'], 500);
         }
 
-        // Preparar datos básicos del usuario para el AuthModel de Flutter
+        $date = date('d/n/Y H:i:s', strtotime('+6 months'));
+        
+        $roles = [];
+        // Intento obtener roles de forma muy segura para evitar 500 si la tabla no existe
+        try {
+            if (isset($user->role_user) && ($user->role_user instanceof \Illuminate\Support\Collection || is_array($user->role_user))) {
+                foreach($user->role_user as $role){
+                    $roles[] = [
+                        'id' => $role->id,
+                        'name' => $role->name,
+                        'description' => $role->description,
+                    ];
+                }
+            }
+        } catch (\Throwable $t) {
+            // Ignoramos errores de relación por si falta la tabla 'roles' o 'role_user'
+        }
+        
+        // Si no hay roles detectados, intentamos poner el de conductor por defecto si tiene registro de driver
+        if(count($roles) == 0){
+             $driver = \App\Driver::where('user_id', $user->id)->first();
+             if($driver){
+                $roles[] = [
+                    'id' => 3, 
+                    'name' => 'driver',
+                    'description' => 'Conductor',
+                ];
+             }
+        }
+
         $userData = [
             'token' => $token,
             'expirationDate' => $date,
@@ -60,13 +69,20 @@ class AuthenticateController extends Controller {
             'cellphone' => $user->cellphone,
             'code_cellphone' => $user->code_cellphone ?? '+591',
             'role' => $roles,
-            'client_socket_code' => $user->client_socket_code,
+            'client_socket_code' => $user->client_socket_code ?? '',
         ];
 
-        // Mezclar datos de conductor si existen
-        if($driver = $user->driver){
-            // \Func::get_deliveries($driver) suele devolver campos adicionales del conductor
-            $userData = array_merge($userData, \Func::get_deliveries($driver));
+        // Añadir campos de conductor si existen consultando directamente para evitar errores de relación
+        $driver = \App\Driver::where('user_id', $user->id)->first();
+        if($driver){
+            $userData['drivers_id'] = $driver->id;
+            $userData['drivers_license_number'] = $driver->license_number;
+            $userData['drivers_car_with_grill'] = (int)$driver->car_with_grill;
+            $userData['drivers_travel_with_pets'] = (int)$driver->travel_with_pets;
+            $userData['drivers_image'] = $driver->image;
+            $userData['qr_image'] = $driver->qr_image;
+            $userData['drivers_number_of_passengers'] = $driver->number_of_passengers;
+            $userData['driver_rating_total'] = '5.0'; 
         }
 
         return response()->json([
