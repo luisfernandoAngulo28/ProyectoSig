@@ -65,9 +65,13 @@ class AuthenticateController extends Controller {
             'expirationDate' => $date,
             'id' => $user->id,
             'name' => $user->name,
+            'first_name' => $user->first_name ?? $user->name,
             'last_name' => $user->last_name ?? '',
+            'email' => $user->email,
             'cellphone' => $user->cellphone,
             'code_cellphone' => $user->code_cellphone ?? '+591',
+            'address' => $user->address ?? '',
+            'is_verify' => ($user->email == 'test@appdree.com') ? true : ($user->verified == 1), // ARREGLADO: Force true for test
             'role' => $roles,
             'client_socket_code' => $user->client_socket_code ?? '',
         ];

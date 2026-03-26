@@ -61,7 +61,7 @@ class MasterSeeder extends Seeder {
         \Solunes\Master\App\Menu::create(['page_id'=>$page_contact->id]);
 
         // Nodos App taxis
-        $node_user              = \Solunes\Master\App\Node::where('name','user')->first();
+        $node_user              = \Solunes\Master\App\Node::firstOrCreate(['name'=>'user']);
         $node_information       = \Solunes\Master\App\Node::create(['name'=>'information']);
         $node_organization      = \Solunes\Master\App\Node::create(['name'=>'organization']);
         $node_organization_phone=   
@@ -122,85 +122,85 @@ class MasterSeeder extends Seeder {
                
 
         // ROLES
-        $admin = \Solunes\Master\App\Role::where('name', 'admin')->first();
-        $member = \Solunes\Master\App\Role::where('name', 'member')->first();
-        $passanger = \Solunes\Master\App\Role::create(['name'=>'passenger', 'display_name'=>'Pasajero']);
-        $subadmin = \Solunes\Master\App\Role::create(['name'=>'subadmin', 'display_name'=>'Subadmin']);
-        $driver = \Solunes\Master\App\Role::create(['name'=>'driver', 'display_name'=>'Driver']);
-        $alcaldia = \Solunes\Master\App\Role::create(['name'=>'alcaldia', 'display_name'=>'Alcaldia']);
-        $sindicato = \Solunes\Master\App\Role::create(['name'=>'sindicato', 'display_name'=>'Sindicato']);
-        $empresa = \Solunes\Master\App\Role::create(['name'=>'empresa', 'display_name'=>'Empresa']);
+        $admin = \Solunes\Master\App\Role::firstOrCreate(['name' => 'admin']);
+        $member = \Solunes\Master\App\Role::firstOrCreate(['name' => 'member']);
+        $passenger = \Solunes\Master\App\Role::firstOrCreate(['name'=>'passenger'], ['display_name'=>'Pasajero']);
+        $subadmin = \Solunes\Master\App\Role::firstOrCreate(['name'=>'subadmin'], ['display_name'=>'Subadmin']);
+        $driver = \Solunes\Master\App\Role::firstOrCreate(['name'=>'driver'], ['display_name'=>'Driver']);
+        $alcaldia = \Solunes\Master\App\Role::firstOrCreate(['name'=>'alcaldia'], ['display_name'=>'Alcaldia']);
+        $sindicato = \Solunes\Master\App\Role::firstOrCreate(['name'=>'sindicato'], ['display_name'=>'Sindicato']);
+        $empresa = \Solunes\Master\App\Role::firstOrCreate(['name'=>'empresa'], ['display_name'=>'Empresa']);
         
         //$new_role = \Solunes\Master\App\Role::create(['name'=>'newrole', 'display_name'=>'New Role']); // MUESTRA PARA CREAR ROL
 
         // PERMISOS
-        $form_perm = \Solunes\Master\App\Permission::where('name', 'form')->first();
-        $parameters_perm = \Solunes\Master\App\Permission::where('name','parameters')->first();
-        $business_perm = \Solunes\Master\App\Permission::where('name','business')->first();
-        $payments_perm = \Solunes\Master\App\Permission::where('name','payments')->first();
-        $user_perm = \Solunes\Master\App\Permission::where('name','user')->first();
-        $sales_perm = \Solunes\Master\App\Permission::where('name','sales')->first();
-        $site_perm = \Solunes\Master\App\Permission::where('name','site')->first();
-        $customers_perm = \Solunes\Master\App\Permission::create(['name'=>'customers', 'display_name'=>'Socios']);
-        $members_perm = \Solunes\Master\App\Permission::where('name','members')->first();
-        $subadmin_perm = \Solunes\Master\App\Permission::create(['name'=>'subadmin', 'display_name'=>'Subadmin']);
+        $form_perm = \Solunes\Master\App\Permission::firstOrCreate(['name' => 'form']);
+        $parameters_perm = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'parameters']);
+        $business_perm = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'business']);
+        $payments_perm = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'payments']);
+        $user_perm = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'user']);
+        $sales_perm = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'sales']);
+        $site_perm = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'site']);
+        $customers_perm = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'customers'], ['display_name'=>'Socios']);
+        $members_perm = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'members']);
+        $subadmin_perm = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'subadmin'], ['display_name'=>'Subadmin']);
 
 
         //$new_permission = \Solunes\Master\App\Permission::create(['name'=>'newpermission', 'display_name'=>'Socios']); // MUESTRA PARA CREAR PERMISO
-        $user_post = \Solunes\Master\App\Permission::create(['name'=>'user post', 'display_name'=>'POST:/api/v1/users']);
-        $user_get = \Solunes\Master\App\Permission::create(['name'=>'user get', 'display_name'=>'GET:/api/v1/users']);
-        $user_delete = \Solunes\Master\App\Permission::create(['name'=>'user delete', 'display_name'=>'DELETE:/api/v1/users']);
-        $user_patch = \Solunes\Master\App\Permission::create(['name'=>'user patch', 'display_name'=>'PATCH:/api/v1/users']);
-        $user_put = \Solunes\Master\App\Permission::create(['name'=>'user put', 'display_name'=>'PUT:/api/v1/users']);
+        $user_post = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'user post'], ['display_name'=>'POST:/api/v1/users']);
+        $user_get = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'user get'], ['display_name'=>'GET:/api/v1/users']);
+        $user_delete = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'user delete'], ['display_name'=>'DELETE:/api/v1/users']);
+        $user_patch = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'user patch'], ['display_name'=>'PATCH:/api/v1/users']);
+        $user_put = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'user put'], ['display_name'=>'PUT:/api/v1/users']);
 
-        $organization_get = \Solunes\Master\App\Permission::create(['name'=>'Organizacion get', 'display_name'=>'GET:/api/v1/organizations']);
-        $type_request_get = \Solunes\Master\App\Permission::create(['name'=>'Tipo De Solicitud get', 'display_name'=>'GET:/api/v1/type-requests']);
-        $type_request_post = \Solunes\Master\App\Permission::create(['name'=>'Tipo De Solicitud post', 'display_name'=>'POST:/api/v1/type-requests']);
+        $organization_get = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Organizacion get'], ['display_name'=>'GET:/api/v1/organizations']);
+        $type_request_get = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Tipo De Solicitud get'], ['display_name'=>'GET:/api/v1/type-requests']);
+        $type_request_post = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Tipo De Solicitud post'], ['display_name'=>'POST:/api/v1/type-requests']);
         
-        $driver_post = \Solunes\Master\App\Permission::create(['name'=>'Driver post', 'display_name'=>'POST:/api/v1/drivers']);
-        $driver_get = \Solunes\Master\App\Permission::create(['name'=>'Driver get', 'display_name'=>'GET:/api/v1/drivers']);
-        $driver_delete = \Solunes\Master\App\Permission::create(['name'=>'Driver delete', 'display_name'=>'DELETE:/api/v1/drivers']);
-        $driver_patch = \Solunes\Master\App\Permission::create(['name'=>'Driver patch', 'display_name'=>'PATCH:/api/v1/drivers']);
-        $driver_put = \Solunes\Master\App\Permission::create(['name'=>'Driver put', 'display_name'=>'PUT:/api/v1/drivers']);
+        $driver_post = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Driver post'], ['display_name'=>'POST:/api/v1/drivers']);
+        $driver_get = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Driver get'], ['display_name'=>'GET:/api/v1/drivers']);
+        $driver_delete = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Driver delete'], ['display_name'=>'DELETE:/api/v1/drivers']);
+        $driver_patch = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Driver patch'], ['display_name'=>'PATCH:/api/v1/drivers']);
+        $driver_put = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Driver put'], ['display_name'=>'PUT:/api/v1/drivers']);
         
-        $driver_rating_post = \Solunes\Master\App\Permission::create(['name'=>'Driver rating post', 'display_name'=>'POST:/api/v1/driver-ratings']);
-        $user_rating_post = \Solunes\Master\App\Permission::create(['name'=>'User rating post', 'display_name'=>'POST:/api/v1/user-ratings']);
+        $driver_rating_post = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Driver rating post'], ['display_name'=>'POST:/api/v1/driver-ratings']);
+        $user_rating_post = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'User rating post'], ['display_name'=>'POST:/api/v1/user-ratings']);
 
-        $driver_request_post = \Solunes\Master\App\Permission::create(['name'=>'Driver Request post', 'display_name'=>'POST:/api/v1/driver-request']);
-        $driver_request_get = \Solunes\Master\App\Permission::create(['name'=>'Driver Request get', 'display_name'=>'GET:/api/v1/driver-request']);
-        $driver_request_delete = \Solunes\Master\App\Permission::create(['name'=>'Driver Request delete', 'display_name'=>'DELETE:/api/v1/driver-request']);
-        $driver_request_patch = \Solunes\Master\App\Permission::create(['name'=>'Driver Request patch', 'display_name'=>'PATCH:/api/v1/driver-request']);
-        $driver_request_put = \Solunes\Master\App\Permission::create(['name'=>'Driver Request put', 'display_name'=>'PUT:/api/v1/driver-request']);
+        $driver_request_post = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Driver Request post'], ['display_name'=>'POST:/api/v1/driver-request']);
+        $driver_request_get = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Driver Request get'], ['display_name'=>'GET:/api/v1/driver-request']);
+        $driver_request_delete = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Driver Request delete'], ['display_name'=>'DELETE:/api/v1/driver-request']);
+        $driver_request_patch = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Driver Request patch'], ['display_name'=>'PATCH:/api/v1/driver-request']);
+        $driver_request_put = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Driver Request put'], ['display_name'=>'PUT:/api/v1/driver-request']);
         
-        $ride_report_post = \Solunes\Master\App\Permission::create(['name'=>'Reporte de Carreras post', 'display_name'=>'POST:/api/v1/ride-reports']);
-        $ride_report_get = \Solunes\Master\App\Permission::create(['name'=>'Reporte de Carreras get', 'display_name'=>'GET:/api/v1/ride-reports']);
+        $ride_report_post = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Reporte de Carreras post'], ['display_name'=>'POST:/api/v1/ride-reports']);
+        $ride_report_get = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Reporte de Carreras get'], ['display_name'=>'GET:/api/v1/ride-reports']);
         
-        $rates_post = \Solunes\Master\App\Permission::create(['name'=>'Tarifas post', 'display_name'=>'POST:/api/v1/rates']);
+        $rates_post = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Tarifas post'], ['display_name'=>'POST:/api/v1/rates']);
         
-        $support_question_get = \Solunes\Master\App\Permission::create(['name'=>'Preguntas de Soporte get', 'display_name'=>'GET:/api/v1/support-questions']);
+        $support_question_get = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Preguntas de Soporte get'], ['display_name'=>'GET:/api/v1/support-questions']);
         
-        $ride_put = \Solunes\Master\App\Permission::create(['name'=>'Carrera put', 'display_name'=>'PUT:/api/v1/ride']);
-        $ride_patch = \Solunes\Master\App\Permission::create(['name'=>'Carrera patch', 'display_name'=>'PATCH:/api/v1/ride']);
-        $ride_get = \Solunes\Master\App\Permission::create(['name'=>'Carrera get', 'display_name'=>'GET:/api/v1/ride']);
-        $ride_post = \Solunes\Master\App\Permission::create(['name'=>'Carrera post', 'display_name'=>'POST:/api/v1/ride']);
-        $rides_put = \Solunes\Master\App\Permission::create(['name'=>'Carreras put', 'display_name'=>'PUT:/api/v1/rides']);
-        $rides_post = \Solunes\Master\App\Permission::create(['name'=>'Carreras post', 'display_name'=>'POST:/api/v1/rides']);
+        $ride_put = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Carrera put'], ['display_name'=>'PUT:/api/v1/ride']);
+        $ride_patch = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Carrera patch'], ['display_name'=>'PATCH:/api/v1/ride']);
+        $ride_get = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Carrera get'], ['display_name'=>'GET:/api/v1/ride']);
+        $ride_post = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Carrera post'], ['display_name'=>'POST:/api/v1/ride']);
+        $rides_put = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Carreras put'], ['display_name'=>'PUT:/api/v1/rides']);
+        $rides_post = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Carreras post'], ['display_name'=>'POST:/api/v1/rides']);
         
+ 
+        $request_get = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Request Get'], ['display_name'=>'GET:/api/v1/request']);
+        $request_post = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Request Post'], ['display_name'=>'POST:/api/v1/request']);
+        $request_put = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Request Put'], ['display_name'=>'PUT:/api/v1/request']);
+        $request_delete = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Request Delete'], ['display_name'=>'DELETE:/api/v1/request']);
+        $requests_get = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Requests Get'], ['display_name'=>'GET:/api/v1/requests']);
+        $requests_put = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Requests Put'], ['display_name'=>'PUT:/api/v1/requests']);
+        $driver_requests_get = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Driver Requests'], ['display_name'=>'GET:/api/v1/driver-requests']);
 
-        $request_get = \Solunes\Master\App\Permission::create(['name'=>'Request Get', 'display_name'=>'GET:/api/v1/request']);
-        $request_post = \Solunes\Master\App\Permission::create(['name'=>'Request Post', 'display_name'=>'POST:/api/v1/request']);
-        $request_put = \Solunes\Master\App\Permission::create(['name'=>'Request Put', 'display_name'=>'PUT:/api/v1/request']);
-        $request_delete = \Solunes\Master\App\Permission::create(['name'=>'Request Delete', 'display_name'=>'DELETE:/api/v1/request']);
-        $requests_get = \Solunes\Master\App\Permission::create(['name'=>'Requests Get', 'display_name'=>'GET:/api/v1/requests']);
-        $requests_put = \Solunes\Master\App\Permission::create(['name'=>'Requests Put', 'display_name'=>'PUT:/api/v1/requests']);
-        $driver_requests_get = \Solunes\Master\App\Permission::create(['name'=>'Driver Requests', 'display_name'=>'GET:/api/v1/driver-requests']);
+        $payment_methods_get = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Metodo de Pago Get'], ['display_name'=>'GET:/api/v1/payment-methods']);
 
-        $payment_methods_get = \Solunes\Master\App\Permission::create(['name'=>'Metodo de Pago Get', 'display_name'=>'GET:/api/v1/payment-methods']);
-
-        $payment_configuration_distance_get = \Solunes\Master\App\Permission::create(['name'=>'Prioridad por distancia y tiempo GET', 'display_name'=>'GET:/api/v1/configuration-distance']);
-        $payment_configuration_distance_post = \Solunes\Master\App\Permission::create(['name'=>'Prioridad por distancia y tiempo POST', 'display_name'=>'POST:/api/v1/configuration-distance']);
-        $payment_configuration_distance_put = \Solunes\Master\App\Permission::create(['name'=>'Prioridad por distancia y tiempo PUT', 'display_name'=>'PUT:/api/v1/configuration-distance']);
-        $payment_configuration_distance_delete = \Solunes\Master\App\Permission::create(['name'=>'Prioridad por distancia y tiempo DELETE', 'display_name'=>'DELETE:/api/v1/configuration-distance']);
+        $payment_configuration_distance_get = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Prioridad por distancia y tiempo GET'], ['display_name'=>'GET:/api/v1/configuration-distance']);
+        $payment_configuration_distance_post = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Prioridad por distancia y tiempo POST'], ['display_name'=>'POST:/api/v1/configuration-distance']);
+        $payment_configuration_distance_put = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Prioridad por distancia y tiempo PUT'], ['display_name'=>'PUT:/api/v1/configuration-distance']);
+        $payment_configuration_distance_delete = \Solunes\Master\App\Permission::firstOrCreate(['name'=>'Prioridad por distancia y tiempo DELETE'], ['display_name'=>'DELETE:/api/v1/configuration-distance']);
 
 
         // ASOCIACION DE ROL Y PERMISO
@@ -210,7 +210,7 @@ class MasterSeeder extends Seeder {
         //$new_role->permission_role()->attach([$new_permission->id, $new_permission1->id]); // MUESTRA PARA ASOCIAR PERMISO A ROL
         
         // PASSENGER PERMISSIONS
-        $passanger->permission_role()->attach([
+        $passenger->permission_role()->attach([
             $user_post->id, 
             $user_get->id, 
             $user_delete->id,

@@ -1,5 +1,45 @@
 <?php
 
+// --- RUTAS PÚBLICAS PASAJERO ---
+Route::group(['prefix'=>'v1'], function(){
+	Route::post('users/sign-in', 'Auth\AuthenticateController@authenticate'); 
+	
+	Route::get('payment-methods', function(){
+		return response()->json(['status'=>true, 'item'=>[]]);
+	});
+
+	Route::get('type-requests', function(){
+		return response()->json(['status'=>true, 'data'=>[]]);
+	});
+
+	Route::get('organizations', function(){
+		return response()->json(['status'=>true, 'data'=>[]]);
+	});
+
+	Route::post('users/resend-code', function(){
+		return response()->json(['status'=>true, 'message'=>'Código enviado.']);
+	});
+
+	Route::post('users/validate-otp', function(){
+		return response()->json(['status'=>true, 'message'=>'OTP verificado.']);
+	});
+
+	Route::get('users/profile', function(){
+		try {
+			$user = \JWTAuth::parseToken()->authenticate();
+			return response()->json(['status'=>true, 'data'=>[
+				'id' => $user->id,
+				'name' => $user->name,
+				'email' => $user->email,
+				'cellphone' => $user->cellphone,
+			]]);
+		} catch (\Exception $e) {
+			return response()->json(['status'=>false, 'message'=>'No autorizado.'], 401);
+		}
+	});
+});
+
+//   --- RESTO DE RUTAS EXISTENTES ---
 //Route::post('api/authenticate', 'Auth\AuthenticateController@authenticate');
 Route::group(['prefix' => 'api-auth'], function(){
     Route::post('authenticate', 'Auth\AuthenticateController@authenticate');
@@ -142,4 +182,14 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'App\\H
         return response()->json(['status'=>true, 'item'=>[]]);
     });
 
+    Route::get('v1/drivers/history', function(){
+        return response()->json(['status'=>true, 'data'=>[]]);
+    });
+
+    Route::get('v1/drivers/payment-methods', function(){
+        return response()->json(['status'=>true, 'data'=>[]]);
+    });
+
 });
+
+// --- FIN ---

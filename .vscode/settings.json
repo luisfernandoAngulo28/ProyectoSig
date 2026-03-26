@@ -1,0 +1,15 @@
+{
+    "php.intelephense.files.exclude": [
+        "**/vendor/**",
+        "**/storage/**"
+    ],
+    "php.intelephense.environment.phpVersion": "7.4.0",
+    "files.exclude": {
+        "**/vendor": true,
+        "**/storage/logs": true
+    },
+    "search.exclude": {
+        "**/vendor": true,
+        "**/storage": true
+    }
+}

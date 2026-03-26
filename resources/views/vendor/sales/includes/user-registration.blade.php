@@ -128,7 +128,7 @@
       <h3>Confirmar Ubicación</h3>
       <p>Por favor, valide que la ubicación seleccionada en el mapa sea correcta. Caso contrario, puede seleccionar una nueva ubicación para el envío.</p>
     @endif
-    {!! \Field::generate_map_field('map_coordinates', 'map', [], ['id'=>'map_coordinates'], $map_coordinates['latitude'].';'.$map_coordinates['longitude'], 'edit'); !!}
+    {!! \Field::generate_map_field('map_coordinates', 'map', [], ['id'=>'map_coordinates'], $map_coordinates['latitude'].';'.$map_coordinates['longitude'], 'edit') !!}
     <br>
   </div>
 @endif

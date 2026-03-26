@@ -349,6 +349,9 @@ class CustomFunc
     {
         // Type = list, item
         $return = 'none';
+        if (!$node) {
+            return $return;
+        }
         if ($node->name == 'temp-file') {
             if ($type == 'list') {
                 $return = 'true';
