@@ -7,10 +7,13 @@ use Illuminate\Http\Request;
 use App\Http\Requests;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Http;
 use JWTAuth;
 use Tymon\JWTAuth\Exceptions\JWTException;
 use App\Helpers\SpecialFunc;
 use App\Driver;
+use App\User;
+use App\Otp;
 
 class AuthenticateController extends Controller {
   
@@ -71,7 +74,7 @@ class AuthenticateController extends Controller {
             'cellphone' => $user->cellphone,
             'code_cellphone' => $user->code_cellphone ?? '+591',
             'address' => $user->address ?? '',
-            'is_verify' => ($user->email == 'test@appdree.com') ? true : ($user->verified == 1), // ARREGLADO: Force true for test
+            'is_verify' => ($user->verified == 1),
             'role' => $roles,
             'client_socket_code' => $user->client_socket_code ?? '',
         ];
@@ -125,12 +128,12 @@ class AuthenticateController extends Controller {
                 \SpecialFunc::send_email( "Recuperar Contraseña", [ $request->input('email') ], 'Reestablecer contraseña.', 
                 'Para restablecer su contraseña, por favor, ingrese el siguiente código en la aplicación móvil y siga las instrucciones proporcionadas. Tenga en cuenta que este código tendrá una validez de 60 minutos: Código:' .$otpCode  );
 
-                return ['status'=>true, 'message'=>'El código se envió correctamente.', 'errors'=>[], 'data'=>['code'=>$otpCode]];
+                return ['status'=>true, 'message'=>'El código se envió correctamente.', 'errors'=>[], 'data'=>[]];
             } 
 
         } catch (\Throwable $th) {
-            echo $th;
-            return  response()->json(['status'=>false, 'message'=>'Error en el servidor.', 'errors'=>[ $th->getMessage() ]] , 500);   
+            \Log::error('Error en sendCodeEmail: ' . $th->getMessage());
+            return  response()->json(['status'=>false, 'message'=>'Error en el servidor.', 'errors'=>['Error interno.']] , 500);   
         }
     }
 
@@ -168,7 +171,8 @@ class AuthenticateController extends Controller {
                 return response()->json(['status'=>false, 'message'=>['El código no existe vuelva a solicitarlo.'], 'errors'=>[ 'Código inválido.' ]] , 400);
             }
         } catch (\Throwable $th) {
-            return  response()->json(['status'=>false, 'message'=>['Error en el servidor.'], 'errors'=>[ $th->getMessage() ]] , 500);
+            \Log::error('Error en recoverPassword: ' . $th->getMessage());
+            return  response()->json(['status'=>false, 'message'=>['Error en el servidor.'], 'errors'=>['Error interno.']] , 500);
         }
     }
 
@@ -204,7 +208,8 @@ class AuthenticateController extends Controller {
 
 
         } catch (\Throwable $th) {
-            return  response()->json(['status'=>false, 'message'=>['Error en el servidor.'], 'errors'=>[ $th->getMessage() ]] , 500);
+            \Log::error('Error en validCode: ' . $th->getMessage());
+            return  response()->json(['status'=>false, 'message'=>['Error en el servidor.'], 'errors'=>['Error interno.']] , 500);
         }
     }
 
@@ -271,7 +276,6 @@ class AuthenticateController extends Controller {
                 'message' => 'Código OTP enviado correctamente.', 
                 'errors' => [],
                 'data' => [
-                    'code' => $otpCode, // ⚠️ ELIMINAR EN PRODUCCIÓN - Solo para testing
                     'expires_in' => 600, // 10 minutos
                     'delivery_channel' => $delivery['channel'],
                     'message_sent' => $delivery['sent']
@@ -279,10 +283,11 @@ class AuthenticateController extends Controller {
             ], 200);
             
         } catch (\Throwable $th) {
+            \Log::error('Error en sendOtpPhone: ' . $th->getMessage());
             return response()->json([
                 'status' => false, 
                 'message' => 'Error en el servidor.', 
-                'errors' => [$th->getMessage()]
+                'errors' => ['Error interno.']
             ], 500);
         }
     }
@@ -359,10 +364,11 @@ class AuthenticateController extends Controller {
             ], 200);
             
         } catch (\Throwable $th) {
+            \Log::error('Error en verifyOtpPhone: ' . $th->getMessage());
             return response()->json([
                 'status' => false, 
                 'message' => ['Error en el servidor.'], 
-                'errors' => [$th->getMessage()]
+                'errors' => ['Error interno.']
             ], 500);
         }
     }
@@ -482,10 +488,11 @@ class AuthenticateController extends Controller {
             ], 201);
             
         } catch (\Throwable $th) {
+            \Log::error('Error en registerWithPhone: ' . $th->getMessage());
             return response()->json([
                 'status' => false, 
                 'message' => ['Error en el servidor.'], 
-                'errors' => [$th->getMessage()]
+                'errors' => ['Error interno.']
             ], 500);
         }
     }
@@ -763,14 +770,13 @@ class AuthenticateController extends Controller {
         $message = "Tu código de verificación AnDre Conductor es: {$code}";
         $delivery = $this->sendOtpMessage($phone, $message);
         
-        // Log para debugging
-        \Log::info("OTP generado para conductor {$phone}: {$code}");
+        // Log sin exponer el código OTP
+        \Log::info("OTP generado para conductor: {$phone}");
         
         return response()->json([
             'status' => true,
             'message' => 'Código OTP enviado correctamente',
             'data' => [
-                'code' => $code, // Solo para testing, remover en producción
                 'expires_in' => 600,
                 'delivery_channel' => $delivery['channel'],
                 'message_sent' => $delivery['sent']
@@ -1098,7 +1104,7 @@ class AuthenticateController extends Controller {
             $phone = $request->phone;
             
             // Validar que el usuario EXISTA en la base de datos
-            $user = User::where('phone', $phone)->first();
+            $user = User::where('cellphone', $phone)->first();
             
             if (!$user) {
                 return response()->json([
@@ -1115,7 +1121,8 @@ class AuthenticateController extends Controller {
             $otp->parent_id = $user->id;
             $otp->code = $code;
             $otp->type = 'phone';
-            $otp->expiry = now()->addMinutes(10);
+            $otp->phone = $phone; // Ensure phone is set for easier lookup
+            $otp->time_expiration_code = time() + 600; // 10 minutes
             $otp->save();
             
             // Enviar OTP por canal configurado (whatsapp por defecto)
@@ -1125,7 +1132,6 @@ class AuthenticateController extends Controller {
             return response()->json([
                 'status' => true,
                 'message' => $delivery['channel'] === 'whatsapp' ? 'Código enviado a tu WhatsApp' : 'Código enviado a tu teléfono',
-                'code' => $code, // SOLO PARA TESTING, remover en producción
                 'delivery_channel' => $delivery['channel'],
             ], 200);
             
@@ -1161,7 +1167,7 @@ class AuthenticateController extends Controller {
             $code = $request->code;
             
             // Buscar usuario
-            $user = User::where('phone', $phone)->first();
+            $user = User::where('cellphone', $phone)->first();
             
             if (!$user) {
                 return response()->json([
@@ -1174,7 +1180,7 @@ class AuthenticateController extends Controller {
             $otp = Otp::where('parent_id', $user->id)
                       ->where('code', $code)
                       ->where('type', 'phone')
-                      ->where('expiry', '>', now())
+                      ->where('time_expiration_code', '>', time())
                       ->orderBy('created_at', 'desc')
                       ->first();
             
@@ -1200,9 +1206,9 @@ class AuthenticateController extends Controller {
                         'id' => $user->id,
                         'name' => $user->name,
                         'email' => $user->email,
-                        'phone' => $user->phone,
+                        'phone' => $user->cellphone,
                         'gender' => $user->gender,
-                        'photo' => $user->photo ? url($user->photo) : null,
+                        'photo' => $user->image ? url($user->image) : null,
                     ]
                 ]
             ], 200);
@@ -1278,7 +1284,6 @@ class AuthenticateController extends Controller {
             return response()->json([
                 'status' => true,
                 'message' => $delivery['channel'] === 'whatsapp' ? 'Código enviado a tu WhatsApp' : 'Código enviado a tu teléfono',
-                'code' => $code, // SOLO PARA TESTING, remover en producción
                 'delivery_channel' => $delivery['channel'],
             ], 200);
             

@@ -16,13 +16,10 @@ Route::group(['prefix'=>'v1'], function(){
 		return response()->json(['status'=>true, 'data'=>[]]);
 	});
 
-	Route::post('users/resend-code', function(){
-		return response()->json(['status'=>true, 'message'=>'Código enviado.']);
-	});
+	// OTP se maneja por los endpoints reales en api-auth/
+	Route::post('users/resend-code', 'Auth\AuthenticateController@sendOtpPhone');
 
-	Route::post('users/validate-otp', function(){
-		return response()->json(['status'=>true, 'message'=>'OTP verificado.']);
-	});
+	Route::post('users/validate-otp', 'Auth\AuthenticateController@verifyOtpPhone');
 
 	Route::get('users/profile', function(){
 		try {
@@ -49,14 +46,18 @@ Route::group(['prefix' => 'api-auth'], function(){
 	Route::post('valid-code', 'Auth\AuthenticateController@validCode');
 	Route::post('recover-password', 'Auth\AuthenticateController@recoverPassword');
 
-	// Endpoints para registro de PASAJERO con teléfono
-	Route::post('send-otp-phone', 'Auth\AuthenticateController@sendOtpPhone');
-	Route::post('verify-otp-phone', 'Auth\AuthenticateController@verifyOtpPhone');
+	// Endpoints para registro de PASAJERO con teléfono (rate limited)
+	Route::group(['middleware' => ['throttle:5,1']], function(){
+		Route::post('send-otp-phone', 'Auth\AuthenticateController@sendOtpPhone');
+		Route::post('verify-otp-phone', 'Auth\AuthenticateController@verifyOtpPhone');
+	});
 	Route::post('register-with-phone', 'Auth\AuthenticateController@registerWithPhone');
 
-	// Endpoints para registro de CONDUCTOR con teléfono
-	Route::post('send-otp-phone-driver', 'Auth\AuthenticateController@sendOtpPhoneDriver');
-	Route::post('verify-otp-phone-driver', 'Auth\AuthenticateController@verifyOtpPhoneDriver');
+	// Endpoints para registro de CONDUCTOR con teléfono (rate limited)
+	Route::group(['middleware' => ['throttle:5,1']], function(){
+		Route::post('send-otp-phone-driver', 'Auth\AuthenticateController@sendOtpPhoneDriver');
+		Route::post('verify-otp-phone-driver', 'Auth\AuthenticateController@verifyOtpPhoneDriver');
+	});
 	Route::post('register-driver-with-phone', 'Auth\AuthenticateController@registerDriverWithPhone');
 
 	// Endpoints para LOGIN de PASAJERO con teléfono
@@ -75,10 +76,10 @@ Route::group(['prefix' => 'api-auth'], function(){
 	Route::group(['middleware' => ['jwt.auth']], function(){
 		Route::post('register-vehicle', 'Auth\AuthenticateController@registerDriverVehicle');
 		Route::post('update-facial-photo', 'Auth\AuthenticateController@updateFacialPhoto');
-	});
 
-	// Endpoint para APROBAR CONDUCTOR (Admin)
-	Route::post('approve-driver', 'Auth\AuthenticateController@approveDriver');
+		// Endpoint para APROBAR CONDUCTOR (Admin - requiere autenticación)
+		Route::post('approve-driver', 'Auth\AuthenticateController@approveDriver');
+	});
 
 });
 
@@ -140,7 +141,7 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'App\\H
 			return response()->json(['status'=>true, 'data'=>[$data]]);
 		} catch (\Exception $e) {
 			\Log::error("Error en v1/drivers/{id}: ".$e->getMessage());
-			return response()->json(['status'=>false, 'message'=>'Error obteniendo perfil: '.$e->getMessage()], 500);
+			return response()->json(['status'=>false, 'message'=>'Error interno del servidor.'], 500);
 		}
 	});
 
@@ -173,7 +174,7 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'App\\H
 			return response()->json(['status'=>true, 'message'=>'Estado actualizado correctamente.', 'active' => (int)$active]);
 		} catch (\Exception $e) {
 			\Log::error("Error en v1/drivers/active: ".$e->getMessage());
-			return response()->json(['status'=>false, 'message'=>'Error de servidor: '.$e->getMessage()], 500);
+			return response()->json(['status'=>false, 'message'=>'Error interno del servidor.'], 500);
 		}
     });
 
@@ -182,11 +183,11 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'App\\H
         return response()->json(['status'=>true, 'item'=>[]]);
     });
 
-    Route::get('v1/drivers/history', function(){
+    Route::get('drivers/history', function(){
         return response()->json(['status'=>true, 'data'=>[]]);
     });
 
-    Route::get('v1/drivers/payment-methods', function(){
+    Route::get('drivers/payment-methods', function(){
         return response()->json(['status'=>true, 'data'=>[]]);
     });
 
