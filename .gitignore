@@ -12,3 +12,28 @@ composer.lock
 .env
 .env.production
 RDS_CONNECTION_INFO.md
+
+# Temp and sensitive scripts
+/*.php
+/*.sql
+/*.js
+/*.json
+!index.php
+!artisan
+!server.php
+!phpspec.yml
+!phpunit.xml
+!gulpfile.js
+!composer.json
+!package.json
+!nginx_taxisapp.conf
+!public/.htaccess
+
+# AWS and docs
+AWS_DEPLOY_GUIDE.md
+CONFIGURACION_TWILIO.md
+ESTADO_IMPLEMENTACION.md
+PASOS_INMEDIATOS.md
+PRE_DEPLOY_TESTS.md
+TWILIO_COMPLETADO.md
+DEPLOY_RESUMEN.md
