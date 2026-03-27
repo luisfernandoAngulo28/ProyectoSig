@@ -15,8 +15,10 @@ class Cors
         'http://18.225.57.224',
         'https://18.225.57.224',
         'http://localhost',
+        'http://localhost:8080',
         'http://localhost:8000',
         'http://127.0.0.1',
+        'http://127.0.0.1:8080',
     ];
 
     /**
@@ -35,12 +37,17 @@ class Cors
 
         // Handle preflight OPTIONS request immediately
         if ($request->isMethod('OPTIONS')) {
-            return response('', 200)
-                ->header('Access-Control-Allow-Origin', $allowedOrigin)
+            $response = response('', 200)
                 ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
                 ->header('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, X-Token-Auth, Authorization, Accept, Origin')
                 ->header('Access-Control-Allow-Credentials', 'true')
                 ->header('Access-Control-Max-Age', '86400');
+
+            if (!empty($allowedOrigin)) {
+                $response->header('Access-Control-Allow-Origin', $allowedOrigin);
+            }
+
+            return $response;
         }
 
         $response = $next($request);
