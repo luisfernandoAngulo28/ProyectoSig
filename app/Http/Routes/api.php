@@ -85,6 +85,14 @@ Route::group(['prefix' => 'api-auth'], function(){
 
 // Cambiamos el grupo de v1 a rutas estándar de Laravel para mayor confiabilidad en el servidor AWS
 Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'App\\Http\\Controllers\\Api'], function(){
+	// Historial de pasajero (stub de compatibilidad para web/mobile)
+	Route::get('users/history', function(){
+		return response()->json([
+			'status' => true,
+			'data' => ['histories' => []],
+		]);
+	});
+
 	// Dashboard
 	Route::get('update-dashboard', 'DashboardController@getUpdateaDashboard');
 	// App
