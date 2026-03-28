@@ -71,7 +71,196 @@ Route::group(['prefix'=>'v1'], function(){
 	// OTP se maneja por los endpoints reales en api-auth/
 	Route::post('users/resend-code', 'Auth\AuthenticateController@sendOtpPhone');
 
-	Route::post('users/validate-otp', 'Auth\AuthenticateController@verifyOtpPhone');
+	// Compatibilidad: flujo antiguo (otp + user_id) y flujo nuevo por telefono.
+	Route::post('users/validate-otp', function(\Illuminate\Http\Request $request){
+		$otp = trim((string)$request->input('otp', ''));
+		$userId = (int)$request->input('user_id', 0);
+
+		if ($otp !== '' && $userId > 0) {
+			try {
+				$otpRecord = \DB::table('otps')
+					->where('parent_id', $userId)
+					->where('code', $otp)
+					->orderBy('id', 'desc')
+					->first();
+
+				if (!$otpRecord) {
+					return response()->json([
+						'status' => false,
+						'message' => ['El codigo es invalido.'],
+						'errors' => ['OTP invalido'],
+					], 400);
+				}
+
+				if ((int)$otpRecord->time_expiration_code > 0 && time() > (int)$otpRecord->time_expiration_code) {
+					return response()->json([
+						'status' => false,
+						'message' => ['El codigo ya expiro.'],
+						'errors' => ['OTP expirado'],
+					], 400);
+				}
+
+				$user = \App\User::find($userId);
+				if (!$user) {
+					return response()->json([
+						'status' => false,
+						'message' => ['Usuario no encontrado.'],
+						'errors' => ['Usuario invalido'],
+					], 404);
+				}
+
+				$updates = [];
+				if (\Schema::hasColumn('users', 'verified')) {
+					$updates['verified'] = 1;
+				}
+				if (\Schema::hasColumn('users', 'is_verify')) {
+					$updates['is_verify'] = 1;
+				}
+				if (!empty($updates)) {
+					\DB::table('users')->where('id', $userId)->update($updates);
+				}
+
+				$user = \App\User::find($userId);
+				$token = \JWTAuth::fromUser($user);
+
+				return response()->json([
+					'status' => true,
+					'message' => ['Codigo verificado correctamente.'],
+					'errors' => [],
+					'data' => [
+						'token' => $token,
+						'expirationDate' => date('d/n/Y H:i:s', strtotime('+6 months')),
+						'id' => (int)$user->id,
+						'name' => (string)($user->name ?: ''),
+						'first_name' => (string)($user->first_name ?: $user->name),
+						'last_name' => (string)($user->last_name ?: ''),
+						'email' => (string)($user->email ?: ''),
+						'cellphone' => (string)($user->cellphone ?: ''),
+						'code_cellphone' => (string)($user->code_cellphone ?: '+591'),
+						'address' => (string)($user->address ?: ''),
+						'is_verify' => true,
+						'client_socket_code' => (string)($user->client_socket_code ?: ''),
+					],
+				], 200);
+			} catch (\Exception $e) {
+				\Log::error('Error v1/users/validate-otp legacy: '.$e->getMessage());
+				return response()->json([
+					'status' => false,
+					'message' => ['Error en el servidor.'],
+					'errors' => ['Error interno'],
+				], 500);
+			}
+		}
+
+		$controller = app('App\\Http\\Controllers\\Auth\\AuthenticateController');
+		return $controller->verifyOtpPhone($request);
+	});
+
+	// Compatibilidad con app pasajero: registro por email/telefono.
+	Route::post('users/sign-up', function(\Illuminate\Http\Request $request){
+		$validator = \Validator::make($request->all(), [
+			'name' => 'required|min:2',
+			'email' => 'required|email|unique:users,email',
+			'cellphone' => 'required|digits_between:8,9|unique:users,cellphone',
+			'password' => 'required|min:6',
+		]);
+
+		if ($validator->fails()) {
+			return response()->json([
+				'status' => false,
+				'message' => ['Debes enviar los parametros correctamente.'],
+				'errors' => $validator->errors()->all(),
+			], 400);
+		}
+
+		try {
+			$user = new \App\User;
+			$user->name = trim((string)$request->input('name', ''));
+			$user->email = strtolower(trim((string)$request->input('email', '')));
+			$user->cellphone = preg_replace('/\D+/', '', (string)$request->input('cellphone', ''));
+			$user->password = bcrypt((string)$request->input('password', ''));
+
+			if (\Schema::hasColumn('users', 'first_name')) {
+				$user->first_name = (string)$request->input('first_name', $user->name);
+			}
+			if (\Schema::hasColumn('users', 'last_name')) {
+				$user->last_name = (string)$request->input('last_name', '');
+			}
+			if (\Schema::hasColumn('users', 'gender')) {
+				$user->gender = (string)$request->input('gender', 'male');
+			}
+			if (\Schema::hasColumn('users', 'sex')) {
+				$user->sex = (string)$request->input('gender', 'male');
+			}
+			if (\Schema::hasColumn('users', 'type')) {
+				$user->type = 'customer';
+			}
+			if (\Schema::hasColumn('users', 'active')) {
+				$user->active = 1;
+			}
+			if (\Schema::hasColumn('users', 'verified')) {
+				$user->verified = 0;
+			}
+			if (\Schema::hasColumn('users', 'is_verify')) {
+				$user->is_verify = 0;
+			}
+			if (\Schema::hasColumn('users', 'client_socket_code')) {
+				$user->client_socket_code = (string)$request->input('client_socket_code', '');
+			}
+
+			if ($request->hasFile('image')) {
+				$path = $request->file('image')->store('users', 'public');
+				if (\Schema::hasColumn('users', 'image')) {
+					$user->image = $path;
+				}
+			} else {
+				$imageStr = (string)$request->input('image', '');
+				if ($imageStr !== '' && \Schema::hasColumn('users', 'image')) {
+					$user->image = $imageStr;
+				}
+			}
+
+			$user->save();
+
+			$otpCode = (string)rand(100000, 999999);
+			\DB::table('otps')->insert([
+				'parent_id' => $user->id,
+				'code' => $otpCode,
+				'type' => 'email',
+				'time_expiration_code' => time() + 3600,
+				'created_at' => date('Y-m-d H:i:s'),
+				'updated_at' => date('Y-m-d H:i:s'),
+			]);
+
+			return response()->json([
+				'status' => true,
+				'message' => ['Usuario registrado correctamente.'],
+				'errors' => [],
+				'data' => [
+					'user' => [
+						'id' => (int)$user->id,
+						'name' => (string)$user->name,
+						'first_name' => (string)($user->first_name ?: $user->name),
+						'last_name' => (string)($user->last_name ?: ''),
+						'email' => (string)$user->email,
+						'cellphone' => (string)$user->cellphone,
+						'address' => (string)($user->address ?: ''),
+						'is_verify' => false,
+						'image' => $user->image,
+						'client_socket_code' => (string)($user->client_socket_code ?: ''),
+					],
+					'code' => $otpCode,
+				],
+			], 201);
+		} catch (\Exception $e) {
+			\Log::error('Error v1/users/sign-up: '.$e->getMessage());
+			return response()->json([
+				'status' => false,
+				'message' => ['Error en el servidor.'],
+				'errors' => ['Error interno'],
+			], 500);
+		}
+	});
 
 	Route::get('users/profile', function(){
 		try {
