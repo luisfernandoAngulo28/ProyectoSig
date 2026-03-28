@@ -458,14 +458,25 @@ class AuthenticateController extends Controller {
             
             // Crear el usuario
             $user = new \App\User;
-            $user->name = $request->input('name');
+            $user->name = trim((string) $request->input('name'));
             $user->cellphone = $phone;
             $user->email = $phone . '@andre.app'; // Email generado
             $user->password = bcrypt(str_random(16)); // Password aleatorio
-            $user->gender = $request->input('gender');
-            $user->type = 'customer'; // Tipo pasajero
-            $user->active = 1;
-            $user->verified = 1;
+            if (\Schema::hasColumn('users', 'gender')) {
+                $user->gender = $request->input('gender');
+            }
+            if (\Schema::hasColumn('users', 'type')) {
+                $user->type = 'customer'; // Tipo pasajero
+            }
+            if (\Schema::hasColumn('users', 'active')) {
+                $user->active = 1;
+            }
+            if (\Schema::hasColumn('users', 'verified')) {
+                $user->verified = 1;
+            }
+            if (\Schema::hasColumn('users', 'is_verify')) {
+                $user->is_verify = 1;
+            }
             
             // Si hay foto
             if($request->has('photo')) {
