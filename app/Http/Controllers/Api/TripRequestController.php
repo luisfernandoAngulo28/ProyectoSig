@@ -2,9 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Request as RideRequest;
-use App\RequestTrip;
-use App\RequestWaypoint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -70,67 +67,79 @@ class TripRequestController extends BaseController
 
             $createdRequest = null;
             DB::transaction(function () use ($user, $homeId, $validated, $waypoints, &$createdRequest) {
-                RideRequest::where('user_id', $user->id)
+                DB::table('requests')
+                    ->where('user_id', $user->id)
                     ->whereIn('status', ['REQUIRED', 'ACCEPTED'])
                     ->update(['status' => 'CANCELLED']);
 
-                $requestItem = new RideRequest();
-                $requestItem->uuid = md5(uniqid((string)$user->id, true));
-                $requestItem->status = 'REQUIRED';
-                $requestItem->type_request_id = (int)$homeId;
-                $requestItem->user_id = (int)$user->id;
-                $requestItem->payment_method_id = (int)$validated['payment_method_id'];
-                $requestItem->offered_price = (float)$validated['offered_price'];
-                $requestItem->type = 'trip';
-                $requestItem->distance = isset($validated['filters']['distance'])
-                    ? (string)$validated['filters']['distance']
-                    : null;
-                $requestItem->requested_rating = isset($validated['filters']['requested_rating'])
-                    ? (int)$validated['filters']['requested_rating']
-                    : 3;
-                $requestItem->taxi_company = isset($validated['filters']['taxi_company'])
-                    ? (string)$validated['filters']['taxi_company']
-                    : '-1';
-                $requestItem->comments = isset($validated['comments']) ? (string)$validated['comments'] : '';
-                $requestItem->longitude = (string)$waypoints[0]['longitude'];
-                $requestItem->latitude = (string)$waypoints[0]['latitude'];
-                $requestItem->is_counterofferable = 0;
-                $requestItem->is_scheduling = isset($validated['is_scheduling']) && $validated['is_scheduling'] ? 1 : 0;
-                $requestItem->date = isset($validated['date']) ? (string)$validated['date'] : null;
-                $requestItem->hour = isset($validated['hour']) ? (string)$validated['hour'] : null;
-                $requestItem->save();
+                $requestUuid = md5(uniqid((string)$user->id, true));
+                $requestId = DB::table('requests')->insertGetId([
+                    'uuid' => $requestUuid,
+                    'status' => 'REQUIRED',
+                    'type_request_id' => (int)$homeId,
+                    'user_id' => (int)$user->id,
+                    'payment_method_id' => (int)$validated['payment_method_id'],
+                    'offered_price' => (float)$validated['offered_price'],
+                    'type' => 'trip',
+                    'distance' => isset($validated['filters']['distance'])
+                        ? (string)$validated['filters']['distance']
+                        : null,
+                    'requested_rating' => isset($validated['filters']['requested_rating'])
+                        ? (int)$validated['filters']['requested_rating']
+                        : 3,
+                    'taxi_company' => isset($validated['filters']['taxi_company'])
+                        ? (string)$validated['filters']['taxi_company']
+                        : '-1',
+                    'comments' => isset($validated['comments']) ? (string)$validated['comments'] : '',
+                    'longitude' => (string)$waypoints[0]['longitude'],
+                    'latitude' => (string)$waypoints[0]['latitude'],
+                    'is_counterofferable' => 0,
+                    'is_scheduling' => isset($validated['is_scheduling']) && $validated['is_scheduling'] ? 1 : 0,
+                    'date' => isset($validated['date']) ? (string)$validated['date'] : null,
+                    'hour' => isset($validated['hour']) ? (string)$validated['hour'] : null,
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
 
-                $tripItem = new RequestTrip();
-                $tripItem->uuid = md5(uniqid('trip', true));
-                $tripItem->parent_id = $requestItem->id;
-                $tripItem->number_of_passengers = isset($validated['config']['number_of_passengers'])
-                    ? (int)$validated['config']['number_of_passengers']
-                    : 1;
-                $tripItem->car_with_grill = !empty($validated['config']['car_with_grill']) ? 1 : 0;
-                $tripItem->baby_chair = !empty($validated['config']['baby_chair']) ? 1 : 0;
-                $tripItem->travel_with_pets = !empty($validated['config']['travel_with_pet']) ? 1 : 0;
-                $tripItem->save();
+                DB::table('request_trips')->insert([
+                    'uuid' => md5(uniqid('trip', true)),
+                    'parent_id' => $requestId,
+                    'number_of_passengers' => isset($validated['config']['number_of_passengers'])
+                        ? (int)$validated['config']['number_of_passengers']
+                        : 1,
+                    'car_with_grill' => !empty($validated['config']['car_with_grill']) ? 1 : 0,
+                    'baby_chair' => !empty($validated['config']['baby_chair']) ? 1 : 0,
+                    'travel_with_pets' => !empty($validated['config']['travel_with_pet']) ? 1 : 0,
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
 
                 foreach ($waypoints as $index => $waypoint) {
-                    $waypointItem = new RequestWaypoint();
-                    $waypointItem->uuid = md5(uniqid('wp', true));
-                    $waypointItem->parent_id = $requestItem->id;
-                    $waypointItem->type = (string)$waypoint['type'];
-                    $waypointItem->address = (string)$waypoint['address'];
-                    $waypointItem->order = isset($waypoint['order'])
-                        ? (int)$waypoint['order']
-                        : ($index + 1);
-                    $waypointItem->status = 'holding';
-                    $waypointItem->latitude = (string)$waypoint['latitude'];
-                    $waypointItem->longitude = (string)$waypoint['longitude'];
-                    $waypointItem->save();
+                    DB::table('request_waypoints')->insert([
+                        'uuid' => md5(uniqid('wp', true)),
+                        'parent_id' => $requestId,
+                        'type' => (string)$waypoint['type'],
+                        'address' => (string)$waypoint['address'],
+                        'order' => isset($waypoint['order'])
+                            ? (int)$waypoint['order']
+                            : ($index + 1),
+                        'status' => 'holding',
+                        'latitude' => (string)$waypoint['latitude'],
+                        'longitude' => (string)$waypoint['longitude'],
+                        'created_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
                 }
 
-                $createdRequest = $requestItem;
+                $createdRequest = [
+                    'id' => $requestId,
+                    'uuid' => $requestUuid,
+                    'status' => 'REQUIRED',
+                ];
             });
 
             Log::info('Trip request created', [
-                'request_id' => $createdRequest->id,
+                'request_id' => $createdRequest['id'],
                 'user_id' => $user->id,
                 'waypoints_count' => count($waypoints),
             ]);
@@ -139,9 +148,9 @@ class TripRequestController extends BaseController
                 'status' => true,
                 'message' => 'Solicitud de viaje creada exitosamente',
                 'item' => [
-                    'request_id' => $createdRequest->id,
-                    'uuid' => $createdRequest->uuid,
-                    'status' => $createdRequest->status,
+                    'request_id' => $createdRequest['id'],
+                    'uuid' => $createdRequest['uuid'],
+                    'status' => $createdRequest['status'],
                     'waypoints_count' => count($waypoints),
                 ],
             ], 201);
@@ -171,7 +180,7 @@ class TripRequestController extends BaseController
                 ], 401);
             }
 
-            $updated = RideRequest::where('user_id', $user->id)
+            $updated = DB::table('requests')->where('user_id', $user->id)
                 ->whereIn('status', ['REQUIRED', 'ACCEPTED'])
                 ->update(['status' => 'CANCELLED']);
 
@@ -238,9 +247,9 @@ class TripRequestController extends BaseController
                 ], 401);
             }
 
-            $requestItem = RideRequest::where('id', $id)
+            $requestItem = DB::table('requests')
+                ->where('id', $id)
                 ->where('user_id', $user->id)
-                ->with(['request_waypoints', 'request_trips'])
                 ->first();
 
             if (!$requestItem) {
@@ -252,7 +261,11 @@ class TripRequestController extends BaseController
 
             return response()->json([
                 'status' => true,
-                'item' => $requestItem,
+                'item' => [
+                    'request' => $requestItem,
+                    'waypoints' => DB::table('request_waypoints')->where('parent_id', $requestItem->id)->orderBy('order')->get(),
+                    'trip' => DB::table('request_trips')->where('parent_id', $requestItem->id)->first(),
+                ],
             ]);
         } catch (\Exception $e) {
             Log::error('Error fetching request details', [
