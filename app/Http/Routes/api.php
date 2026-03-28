@@ -9,7 +9,29 @@ Route::group(['prefix'=>'v1'], function(){
 	});
 
 	Route::get('type-requests', function(){
-		return response()->json(['status'=>true, 'data'=>[]]);
+		try {
+			$items = \DB::table('type_requests')
+				->where('active', 1)
+				->orderBy('id', 'asc')
+				->get();
+
+			$data = [];
+			foreach ($items as $item) {
+				$data[] = [
+					'type_requests_id' => (int)$item->id,
+					'nameForFront' => (string)($item->name ?: ''),
+					'logo' => $item->logo_image,
+					'description' => (string)($item->description ?: ''),
+					'text_color' => (string)($item->text_color ?: '#000000'),
+					'active' => 1,
+				];
+			}
+
+			return response()->json(['status' => true, 'data' => $data]);
+		} catch (\Exception $e) {
+			\Log::error('Error v1/type-requests: '.$e->getMessage());
+			return response()->json(['status' => false, 'message' => 'No se pudieron obtener tipos de solicitud', 'data' => []], 500);
+		}
 	});
 
 	Route::get('organizations', function(){
