@@ -223,14 +223,29 @@ Route::group(['prefix'=>'v1'], function(){
 			$user->save();
 
 			$otpCode = (string)rand(100000, 999999);
-			\DB::table('otps')->insert([
+			$otpInsert = [
 				'parent_id' => $user->id,
 				'code' => $otpCode,
-				'type' => 'email',
 				'time_expiration_code' => time() + 3600,
 				'created_at' => date('Y-m-d H:i:s'),
 				'updated_at' => date('Y-m-d H:i:s'),
-			]);
+			];
+
+			// Compatibilidad con esquemas legacy de la tabla otps.
+			if (\Schema::hasColumn('otps', 'type')) {
+				$otpInsert['type'] = 'email';
+			}
+			if (\Schema::hasColumn('otps', 'phone')) {
+				$otpInsert['phone'] = (string)$user->cellphone;
+			}
+			if (!\Schema::hasColumn('otps', 'created_at')) {
+				unset($otpInsert['created_at']);
+			}
+			if (!\Schema::hasColumn('otps', 'updated_at')) {
+				unset($otpInsert['updated_at']);
+			}
+
+			\DB::table('otps')->insert($otpInsert);
 
 			return response()->json([
 				'status' => true,
