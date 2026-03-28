@@ -199,6 +199,19 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'App\\H
         return response()->json(['status'=>true, 'data'=>[]]);
     });
 
+    // ===== ENDPOINTS DE SOLICITUD DE VIAJES (PASAJERO) =====
+    // POST v1/type-requests/{homeId}/requests-trip
+    Route::post('type-requests/{homeId}/requests-trip', 'TripRequestController@createTripRequest');
+
+    // PUT v1/requests/cancel - Cancelar solicitudes pendientes
+    Route::put('requests/cancel', 'TripRequestController@cancelPendingRequests');
+
+    // GET v1/requests/ride/user/available - Obtener viajes activos del usuario
+    Route::get('requests/ride/user/available', 'TripRequestController@getAvailableRides');
+
+    // GET v1/requests/{id} - Obtener detalles de una solicitud
+    Route::get('requests/{id}', 'TripRequestController@getTripRequest');
+
 });
 
 // --- FIN ---
