@@ -459,6 +459,14 @@ class AuthenticateController extends Controller {
             // Crear el usuario
             $user = new \App\User;
             $fullName = trim((string) $request->input('name'));
+            if (strlen($fullName) < 2) {
+                $fallbackFirst = trim((string) $request->input('first_name'));
+                $fallbackLast = trim((string) $request->input('last_name'));
+                $fullName = trim($fallbackFirst . ' ' . $fallbackLast);
+            }
+            if (strlen($fullName) < 2) {
+                $fullName = 'Usuario ' . $phone;
+            }
             $nameParts = preg_split('/\s+/', $fullName, 2);
             $firstName = $nameParts[0] ?? $fullName;
             $lastName = $nameParts[1] ?? '';
@@ -537,7 +545,7 @@ class AuthenticateController extends Controller {
                 'data' => [
                     'user' => [
                         'id' => $user->id,
-                        'name' => $user->name ?: $fullName,
+                        'name' => trim((string) $user->name) !== '' ? $user->name : $fullName,
                         'cellphone' => $user->cellphone,
                         'email' => $user->email,
                         'gender' => $user->gender ?? $genderValue,
