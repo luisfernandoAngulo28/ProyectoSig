@@ -442,20 +442,22 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'Api'],
 
 	Route::get('drivers/nearby', function(\Illuminate\Http\Request $request){
 		try {
-			$drivers = \DB::table('drivers')
+			$rawDrivers = \DB::table('drivers')
 				->where('active', 1)
 				->whereNotNull('latitude')
 				->whereNotNull('longitude')
 				->orderBy('id', 'desc')
 				->limit(20)
-				->get()
-				->map(function($d){
-					return [
-						'id' => (int)$d->id,
-						'latitude' => (string)$d->latitude,
-						'longitude' => (string)$d->longitude,
-					];
-				});
+				->get();
+
+			$drivers = [];
+			foreach ($rawDrivers as $d) {
+				$drivers[] = [
+					'id' => (int)$d->id,
+					'latitude' => (string)$d->latitude,
+					'longitude' => (string)$d->longitude,
+				];
+			}
 
 			return response()->json([
 				'status' => true,
