@@ -146,7 +146,13 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'Api'],
 	});
 
 	// Dashboard
-	Route::get('update-dashboard', 'DashboardController@getUpdateaDashboard');
+	Route::get('update-dashboard', function(){
+		return response()->json([
+			'status' => true,
+			'message' => 'Dashboard endpoint temporalmente deshabilitado',
+			'item' => null,
+		]);
+	});
 
 	// ==================== SOPORTE PARA SOLICITUD DE VIAJE (PASAJERO) ====================
 	Route::post('rates', function(\Illuminate\Http\Request $request){
