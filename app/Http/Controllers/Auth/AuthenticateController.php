@@ -458,12 +458,27 @@ class AuthenticateController extends Controller {
             
             // Crear el usuario
             $user = new \App\User;
-            $user->name = trim((string) $request->input('name'));
+            $fullName = trim((string) $request->input('name'));
+            $nameParts = preg_split('/\s+/', $fullName, 2);
+            $firstName = $nameParts[0] ?? $fullName;
+            $lastName = $nameParts[1] ?? '';
+            $genderValue = $request->input('gender');
+
+            $user->name = $fullName;
             $user->cellphone = $phone;
             $user->email = $phone . '@andre.app'; // Email generado
             $user->password = bcrypt(str_random(16)); // Password aleatorio
             if ($this->hasTableColumnSafe('users', 'gender')) {
-                $user->gender = $request->input('gender');
+                $user->gender = $genderValue;
+            }
+            if ($this->hasTableColumnSafe('users', 'sex')) {
+                $user->sex = $genderValue;
+            }
+            if ($this->hasTableColumnSafe('users', 'first_name')) {
+                $user->first_name = $firstName;
+            }
+            if ($this->hasTableColumnSafe('users', 'last_name')) {
+                $user->last_name = $lastName;
             }
             if ($this->hasTableColumnSafe('users', 'type')) {
                 $user->type = 'customer'; // Tipo pasajero
@@ -484,6 +499,29 @@ class AuthenticateController extends Controller {
             }
             
             $user->save();
+
+            // Forzar persistencia directa para esquemas con observers/mutaciones heredadas.
+            $forceUpdate = [];
+            if ($this->hasTableColumnSafe('users', 'name')) {
+                $forceUpdate['name'] = $fullName;
+            }
+            if ($this->hasTableColumnSafe('users', 'first_name')) {
+                $forceUpdate['first_name'] = $firstName;
+            }
+            if ($this->hasTableColumnSafe('users', 'last_name')) {
+                $forceUpdate['last_name'] = $lastName;
+            }
+            if ($this->hasTableColumnSafe('users', 'gender')) {
+                $forceUpdate['gender'] = $genderValue;
+            }
+            if ($this->hasTableColumnSafe('users', 'sex')) {
+                $forceUpdate['sex'] = $genderValue;
+            }
+            if (!empty($forceUpdate)) {
+                \DB::table('users')->where('id', $user->id)->update($forceUpdate);
+            }
+
+            $user = \App\User::find($user->id);
             
             // Actualizar el OTP con el user_id
             $otpRecord->parent_id = $user->id;
@@ -499,10 +537,10 @@ class AuthenticateController extends Controller {
                 'data' => [
                     'user' => [
                         'id' => $user->id,
-                        'name' => $user->name,
+                        'name' => $user->name ?: $fullName,
                         'cellphone' => $user->cellphone,
                         'email' => $user->email,
-                        'gender' => $user->gender,
+                        'gender' => $user->gender ?? $genderValue,
                         'image' => $user->image,
                     ],
                     'token' => $token,
