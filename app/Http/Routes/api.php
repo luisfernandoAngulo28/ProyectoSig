@@ -147,6 +147,137 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'Api'],
 
 	// Dashboard
 	Route::get('update-dashboard', 'DashboardController@getUpdateaDashboard');
+
+	// ==================== SOPORTE PARA SOLICITUD DE VIAJE (PASAJERO) ====================
+	Route::post('rates', function(\Illuminate\Http\Request $request){
+		try {
+			$distanceRaw = (string)$request->input('distance', '1');
+			$distance = (float)str_replace([',', ' km', ' m'], ['.', '', ''], strtolower($distanceRaw));
+			if ($distance <= 0) {
+				$distance = 1;
+			}
+
+			$cityId = (int)$request->input('city', 0);
+			$rate = null;
+			if ($cityId > 0) {
+				$rate = \DB::table('rates')->where('city_id', $cityId)->orderBy('id', 'desc')->first();
+			}
+
+			if (!$rate) {
+				$rate = \DB::table('rates')->orderBy('id', 'desc')->first();
+			}
+
+			if ($rate) {
+				$baseRate = (float)$rate->base_rate;
+				$kmRate = isset($rate->km_rate) ? (float)$rate->km_rate : 0.0;
+				$total = $baseRate + ($kmRate * $distance);
+				if ($total <= 0) {
+					$total = 10.0;
+				}
+
+				return response()->json([
+					'status' => true,
+					'data' => [
+						'base_rate' => round($total, 2),
+					]
+				]);
+			}
+
+			// Fallback seguro si no hay tabla rates poblada
+			return response()->json([
+				'status' => true,
+				'data' => [
+					'base_rate' => round(max(10.0, 5 + ($distance * 2.0)), 2),
+				]
+			]);
+		} catch (\Exception $e) {
+			\Log::error('Error v1/rates: '.$e->getMessage());
+			return response()->json([
+				'status' => true,
+				'data' => [
+					'base_rate' => 10.0,
+				]
+			]);
+		}
+	});
+
+	Route::get('cities/lat-lng', function(\Illuminate\Http\Request $request){
+		try {
+			$lat = $request->input('lat');
+			$lng = $request->input('long');
+
+			$city = \DB::table('cities')->where('active', 1)->orderBy('id', 'asc')->first();
+			if (!$city) {
+				$city = \DB::table('cities')->orderBy('id', 'asc')->first();
+			}
+
+			if ($city) {
+				$cityName = isset($city->name) ? (string)$city->name : 'Ciudad';
+				return response()->json([
+					'status' => true,
+					'item' => [
+						'id' => (int)$city->id,
+						'name' => $cityName,
+						'lat' => $lat,
+						'lng' => $lng,
+					]
+				]);
+			}
+
+			return response()->json([
+				'status' => true,
+				'item' => [
+					'id' => 1,
+					'name' => 'Santa Cruz',
+					'lat' => $lat,
+					'lng' => $lng,
+				]
+			]);
+		} catch (\Exception $e) {
+			\Log::error('Error v1/cities/lat-lng: '.$e->getMessage());
+			return response()->json([
+				'status' => true,
+				'item' => [
+					'id' => 1,
+					'name' => 'Santa Cruz',
+				]
+			]);
+		}
+	});
+
+	Route::get('drivers/nearby', function(\Illuminate\Http\Request $request){
+		try {
+			$drivers = \DB::table('drivers')
+				->where('active', 1)
+				->whereNotNull('latitude')
+				->whereNotNull('longitude')
+				->orderBy('id', 'desc')
+				->limit(20)
+				->get()
+				->map(function($d){
+					return [
+						'id' => (int)$d->id,
+						'latitude' => (string)$d->latitude,
+						'longitude' => (string)$d->longitude,
+					];
+				});
+
+			return response()->json([
+				'status' => true,
+				'item' => [
+					'drivers' => $drivers,
+				],
+			]);
+		} catch (\Exception $e) {
+			\Log::error('Error v1/drivers/nearby: '.$e->getMessage());
+			return response()->json([
+				'status' => true,
+				'item' => ['drivers' => []],
+			]);
+		}
+	});
+	// ==================== FIN SOPORTE PASAJERO ====================
+
 	// App
 	Route::post('login', 'AppController@postLogin');
 	Route::get('check-login', 'AppController@getCheckLogin');
