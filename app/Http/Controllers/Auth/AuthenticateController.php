@@ -237,6 +237,7 @@ class AuthenticateController extends Controller {
 
         try {
             $phone = $request->input('phone');
+            $exposeOtpCode = filter_var(env('OTP_EXPOSE_CODE', 'false'), FILTER_VALIDATE_BOOLEAN);
             
             // Verificar si el teléfono ya está registrado
             $userExists = \App\User::where('cellphone', $phone)->first();
@@ -267,8 +268,18 @@ class AuthenticateController extends Controller {
             $otpMessage = "Tu código de verificación AnDre Taxi es: " . $otpCode . ". Válido por 10 minutos.";
             $delivery = $this->sendOtpMessage($phone, $otpMessage);
 
-            if (!$delivery['sent']) {
+            if (!$delivery['sent'] && !$exposeOtpCode) {
                 \Log::warning("OTP could not be delivered to: {$phone}, but OTP was saved.");
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No se pudo enviar el código de verificación en este momento. Intenta nuevamente.',
+                    'errors' => ['No fue posible entregar el OTP por WhatsApp/SMS.'],
+                    'data' => [
+                        'expires_in' => 600,
+                        'delivery_channel' => $delivery['channel'],
+                        'message_sent' => false,
+                    ]
+                ], 503);
             }
             
             return response()->json([
@@ -278,7 +289,8 @@ class AuthenticateController extends Controller {
                 'data' => [
                     'expires_in' => 600, // 10 minutos
                     'delivery_channel' => $delivery['channel'],
-                    'message_sent' => $delivery['sent']
+                    'message_sent' => $delivery['sent'],
+                    'code' => $exposeOtpCode ? $otpCode : null,
                 ]
             ], 200);
             
@@ -1090,8 +1102,12 @@ class AuthenticateController extends Controller {
     public function loginWithPhone(Request $request)
     {
         try {
+            $normalizedPhone = $this->normalizePhoneDigits($request->input('phone', ''));
+            $request->merge(['phone' => $normalizedPhone]);
+            $exposeOtpCode = filter_var(env('OTP_EXPOSE_CODE', 'false'), FILTER_VALIDATE_BOOLEAN);
+
             $validator = Validator::make($request->all(), [
-                'phone' => 'required|string|min:8|max:9',
+                'phone' => 'required|digits_between:8,9',
             ]);
             
             if ($validator->fails()) {
@@ -1128,11 +1144,22 @@ class AuthenticateController extends Controller {
             // Enviar OTP por canal configurado (whatsapp por defecto)
             $message = "Tu código de acceso AnDre es: {$code}. Válido por 10 minutos.";
             $delivery = $this->sendOtpMessage($phone, $message);
+
+            if (!$delivery['sent'] && !$exposeOtpCode) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No se pudo enviar el código de verificación en este momento. Intenta nuevamente.',
+                    'delivery_channel' => $delivery['channel'],
+                    'message_sent' => false,
+                ], 503);
+            }
             
             return response()->json([
                 'status' => true,
                 'message' => $delivery['channel'] === 'whatsapp' ? 'Código enviado a tu WhatsApp' : 'Código enviado a tu teléfono',
                 'delivery_channel' => $delivery['channel'],
+                'message_sent' => true,
+                'code' => $exposeOtpCode ? $code : null,
             ], 200);
             
         } catch (\Exception $e) {
@@ -1151,8 +1178,11 @@ class AuthenticateController extends Controller {
     public function loginVerifyPhone(Request $request)
     {
         try {
+            $normalizedPhone = $this->normalizePhoneDigits($request->input('phone', ''));
+            $request->merge(['phone' => $normalizedPhone]);
+
             $validator = Validator::make($request->all(), [
-                'phone' => 'required|string|min:8|max:9',
+                'phone' => 'required|digits_between:8,9',
                 'code' => 'required|string|size:6',
             ]);
             
