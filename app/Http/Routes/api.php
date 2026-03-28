@@ -9,9 +9,35 @@ Route::group(['prefix'=>'v1'], function(){
 	});
 
 	Route::get('type-requests', function(){
+		$fallback = [
+			[
+				'type_requests_id' => 1,
+				'nameForFront' => 'Viaje por Taxi',
+				'logo' => null,
+				'description' => 'Solicita transporte punto a punto',
+				'text_color' => '#00CFC8',
+				'active' => 1,
+			],
+			[
+				'type_requests_id' => 2,
+				'nameForFront' => 'Viaje por Mototaxi',
+				'logo' => null,
+				'description' => 'Traslado rapido en mototaxi',
+				'text_color' => '#00CFC8',
+				'active' => 1,
+			],
+			[
+				'type_requests_id' => 3,
+				'nameForFront' => 'Envio',
+				'logo' => null,
+				'description' => 'Envia paquetes y documentos',
+				'text_color' => '#00CFC8',
+				'active' => 1,
+			],
+		];
+
 		try {
 			$items = \DB::table('type_requests')
-				->where('active', 1)
 				->orderBy('id', 'asc')
 				->get();
 
@@ -27,10 +53,14 @@ Route::group(['prefix'=>'v1'], function(){
 				];
 			}
 
+			if (empty($data)) {
+				return response()->json(['status' => true, 'data' => $fallback]);
+			}
+
 			return response()->json(['status' => true, 'data' => $data]);
 		} catch (\Exception $e) {
 			\Log::error('Error v1/type-requests: '.$e->getMessage());
-			return response()->json(['status' => false, 'message' => 'No se pudieron obtener tipos de solicitud', 'data' => []], 500);
+			return response()->json(['status' => true, 'data' => $fallback]);
 		}
 	});
 
