@@ -462,19 +462,19 @@ class AuthenticateController extends Controller {
             $user->cellphone = $phone;
             $user->email = $phone . '@andre.app'; // Email generado
             $user->password = bcrypt(str_random(16)); // Password aleatorio
-            if (\Schema::hasColumn('users', 'gender')) {
+            if ($this->hasTableColumnSafe('users', 'gender')) {
                 $user->gender = $request->input('gender');
             }
-            if (\Schema::hasColumn('users', 'type')) {
+            if ($this->hasTableColumnSafe('users', 'type')) {
                 $user->type = 'customer'; // Tipo pasajero
             }
-            if (\Schema::hasColumn('users', 'active')) {
+            if ($this->hasTableColumnSafe('users', 'active')) {
                 $user->active = 1;
             }
-            if (\Schema::hasColumn('users', 'verified')) {
+            if ($this->hasTableColumnSafe('users', 'verified')) {
                 $user->verified = 1;
             }
-            if (\Schema::hasColumn('users', 'is_verify')) {
+            if ($this->hasTableColumnSafe('users', 'is_verify')) {
                 $user->is_verify = 1;
             }
             
@@ -565,6 +565,17 @@ class AuthenticateController extends Controller {
             
         } catch (\Exception $e) {
             \Log::error('Twilio SMS Error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    private function hasTableColumnSafe($table, $column)
+    {
+        try {
+            $results = \DB::select("SHOW COLUMNS FROM `{$table}` LIKE ?", [$column]);
+            return !empty($results);
+        } catch (\Throwable $e) {
+            \Log::warning("No se pudo verificar columna {$table}.{$column}: " . $e->getMessage());
             return false;
         }
     }
