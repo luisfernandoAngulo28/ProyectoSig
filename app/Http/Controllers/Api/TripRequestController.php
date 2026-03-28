@@ -32,12 +32,12 @@ class TripRequestController extends BaseController
                 'waypoints.*.type' => 'required|in:origin,checkpoint,destination',
                 'offered_price' => 'required|numeric|min:1',
                 'payment_method_id' => 'required|integer|min:0',
-                'comments' => 'nullable|string|max:500',
-                'filters' => 'nullable|array',
-                'config' => 'nullable|array',
-                'date' => 'nullable|string|max:20',
-                'hour' => 'nullable|string|max:20',
-                'is_scheduling' => 'nullable|boolean',
+                'comments' => 'sometimes|string|max:500',
+                'filters' => 'sometimes|array',
+                'config' => 'sometimes|array',
+                'date' => 'sometimes|string|max:20',
+                'hour' => 'sometimes|string|max:20',
+                'is_scheduling' => 'sometimes|boolean',
             ]);
 
             if ($validator->fails()) {
