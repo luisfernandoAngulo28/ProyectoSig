@@ -48,7 +48,7 @@ class TripRequestController extends BaseController
                 ], 422);
             }
 
-            $validated = $validator->validated();
+            $validated = $validator->getData();
             $waypoints = $validated['waypoints'];
 
             if ($waypoints[0]['type'] !== 'origin') {
