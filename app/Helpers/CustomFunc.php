@@ -169,7 +169,7 @@ class CustomFunc
     public static function custom_admin_node_actions($node, $action_nodes)
     {
         if (auth()->user()->hasRole('admin')) {
-            if (in_array($node->name, ['user', 'organization', 'driver', 'sindicato', 'driver-vehicle', 'panic-button', 'driver-rating', 'driver-activation', 'firebase-notification', 'vehicle-brand', 'vehicle-model'])) {
+            if (in_array($node->name, ['user', 'organization', 'driver', 'sindicato', 'driver-vehicle', 'panic-button', 'driver-rating', 'driver-activation', 'firebase-notification', 'vehicle-brand', 'vehicle-model', 'city', 'region'])) {
                 $action_nodes = ['excel', 'create'];
             }
         } elseif (auth()->user()->hasRole('alcaldia')) {
@@ -225,7 +225,7 @@ class CustomFunc
                 $action_fields = ['edit', 'view'];
             }
 
-            if (in_array($node_name, ['driver-vehicle',  'vehicle-brand', 'vehicle-model'])) {
+            if (in_array($node_name, ['driver-vehicle',  'vehicle-brand', 'vehicle-model', 'city', 'region'])) {
                 $action_fields = ['edit', 'view', 'delete'];
             }
 
@@ -443,7 +443,7 @@ class CustomFunc
                     $response .= '<td class="edit">
                     <a style="display: inline !important;" href="/customer-admin/model/driver/view/' . $item->id . '">Ver</a>
                     <a style="display: inline !important;" href="/customer-admin/model/driver/edit/' . $item->id . '"> Editar </a>
-                    
+                    <a style="display: inline !important; background: #7367f0; color: white; padding: 3px 10px; border-radius: 4px; text-decoration: none; font-size: 12px;" href="/customer-admin/driver-detail/' . $item->id . '">&#128269; Revisar Solicitud</a>
                     </td>';
                 } else {
                     $response .= '<td class="edit" >
@@ -453,6 +453,8 @@ class CustomFunc
                     <br>
                     <br>
                     <a  style="display: inline !important;" href="/customer-admin/register-driver/step1-update/' . $item->id . '" target="_blank">Reg. Vehiculo</a>
+                    <br>
+                    <a style="display: inline !important; background: #7367f0; color: white; padding: 3px 10px; border-radius: 4px; text-decoration: none; font-size: 12px;" href="/customer-admin/driver-detail/' . $item->id . '">&#128269; Revisar Solicitud</a>
                     </td>';
                 }
             } elseif (auth()->user()->hasRole('subadmin')) {
@@ -545,6 +547,7 @@ class CustomFunc
                     <input type="checkbox" onclick="sendEmailLibelula(' . $item->id . ')" />
                 </div>';
             }
+            $response .= '</td>';
         } elseif ($action_field == 'assign_me') {
             $response .= '<td class="ineditable">';
 

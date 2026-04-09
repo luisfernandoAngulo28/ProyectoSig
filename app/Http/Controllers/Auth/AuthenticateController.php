@@ -1516,23 +1516,21 @@ class AuthenticateController extends Controller {
     public function getVehicleBrands(Request $request)
     {
         try {
-            // Quitamos el filtro de type_vehicle porque la columna no existe en la tabla vehicle_brands
-            $brands = \DB::table('vehicle_brands')->where('active', 1)
+            $brands = \DB::table('vehicle_brands')
+                ->where('active', 1)
                 ->orderBy('name', 'asc')
                 ->get(['id', 'name']);
 
             return response()->json([
-                'status' => true,
+                'status'  => true,
                 'message' => 'Marcas obtenidas exitosamente',
-                'data' => [
-                    'brands' => $brands
-                ]
+                'data'    => $brands,          // array plano, consistente con el resto
             ], 200);
-            
+
         } catch (\Exception $e) {
             \Log::error('Error en getVehicleBrands: ' . $e->getMessage());
             return response()->json([
-                'status' => false,
+                'status'  => false,
                 'message' => 'Error al obtener marcas: ' . $e->getMessage(),
             ], 500);
         }
@@ -2054,6 +2052,100 @@ class AuthenticateController extends Controller {
             
         } catch (\Exception $e) {
             \Log::error('Error al enviar notificación de bloqueo por WhatsApp: ' . $e->getMessage());
+        }
+    }
+
+    // ==========================================
+    // CATÁLOGOS PÚBLICOS (para dropdowns de registro)
+    // ==========================================
+
+    /**
+     * GET /api-auth/regions
+     * Retorna todos los departamentos/regiones activos.
+     */
+    public function getRegions(Request $request)
+    {
+        try {
+            $regions = \DB::table('regions as r')
+                ->join('region_translation as rt', function ($j) {
+                    $j->on('rt.region_id', '=', 'r.id')
+                      ->where('rt.locale', '=', 'es');
+                })
+                ->where('r.active', 1)
+                ->orderBy('r.order', 'asc')
+                ->get(['r.id', 'r.code', 'rt.name']);
+
+            return response()->json([
+                'status' => true,
+                'data'   => $regions,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('getRegions: ' . $e->getMessage());
+            return response()->json(['status' => false, 'message' => 'Error al obtener departamentos.'], 500);
+        }
+    }
+
+    /**
+     * GET /api-auth/cities?region_id=X
+     * Retorna municipios de un departamento.
+     */
+    public function getCitiesByRegion(Request $request)
+    {
+        try {
+            $regionId = (int) $request->input('region_id', 0);
+
+            $query = \DB::table('cities as c')
+                ->join('city_translations as ct', function ($j) {
+                    $j->on('ct.city_id', '=', 'c.id')
+                      ->where('ct.locale', '=', 'es');
+                })
+                ->where('c.active', 1)
+                ->orderBy('ct.name', 'asc')
+                ->select(['c.id', 'c.region_id', 'ct.name']);
+
+            if ($regionId > 0) {
+                $query->where('c.region_id', $regionId);
+            }
+
+            $cities = $query->get();
+
+            return response()->json([
+                'status' => true,
+                'data'   => $cities,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('getCitiesByRegion: ' . $e->getMessage());
+            return response()->json(['status' => false, 'message' => 'Error al obtener municipios.'], 500);
+        }
+    }
+
+    /**
+     * GET /api-auth/organizations?city_id=X
+     * Retorna organizaciones/federaciones de una ciudad.
+     */
+    public function getOrganizationsByCity(Request $request)
+    {
+        try {
+            $cityId = (int) $request->input('city_id', 0);
+
+            $query = \DB::table('organizations')
+                ->where('active', 1)
+                ->orderBy('name', 'asc')
+                ->select(['id', 'name', 'city_id', 'type']);
+
+            if ($cityId > 0) {
+                $query->where('city_id', $cityId);
+            }
+
+            $organizations = $query->get();
+
+            return response()->json([
+                'status' => true,
+                'data'   => $organizations,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('getOrganizationsByCity: ' . $e->getMessage());
+            return response()->json(['status' => false, 'message' => 'Error al obtener organizaciones.'], 500);
         }
     }
 

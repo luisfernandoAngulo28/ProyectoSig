@@ -501,14 +501,14 @@ class MainController extends Controller
 	{
 		// $user = auth()->user();
 		// $site = \Solunes\
-		$cities = \Solunes\Business\App\City::get();
+		$cities = []; // Se carga dinámicamente por JS según el Departamento seleccionado
 		$regions = \Solunes\Business\App\Region::get();
 		$organizations = \App\Organization::where('type', 'company')->get();
 
 		$vehiclesModels = \App\VehicleModel::where('active', true)->get();
 		$vehiclesBrands = \App\VehicleBrand::where('active', true)->get();
 		$banks = \App\Bank::get();
-		$type_vehicle = [["id" => "auto", "name" => "Automóvil"], ["id" => "moto", "name" => "Motocicleta"]];
+		$type_vehicle = [["id" => "auto", "name" => "Automóvil"], ["id" => "moto", "name" => "Motocicleta"], ["id" => "torito", "name" => "Torito"]];
 
 		return view('content.register.step1', [
 			'site' => [],
@@ -608,7 +608,9 @@ class MainController extends Controller
 
 	public function postRegisterDriver(Request $request)
 	{
-
+		\Log::info('========== INICIO REGISTRO CONDUCTOR ==========');
+		\Log::info('Datos recibidos:', $request->except(['password', 'image', 'license_front_image', 'license_back_image', 'ci_front_image', 'ci_back_image', 'vehicle_image', 'side_image']));
+		\Log::info('Archivos recibidos:', array_keys($request->allFiles()));
 
 		$validator = \Validator::make($request->all(), [
 			'first_name' => 'required',
@@ -619,8 +621,8 @@ class MainController extends Controller
 			'license_number' => 'sometimes',
 			'license_expiration_date' => 'sometimes',
 			'number_of_passengers' => 'sometimes',
-			'password' => 'required',
-			'image' => 'required|image|mimes:jpeg,png,jpg',
+			'password' => 'sometimes|nullable',
+			'image' => 'required|file|mimes:jpeg,png,jpg,webp,gif,bmp,heic,heif,svg',
 			'license_front_image' => 'sometimes',
 			'license_back_image' => 'sometimes',
 			'ci_front_image' => 'sometimes',
@@ -691,13 +693,16 @@ class MainController extends Controller
 
 		if ($validator->fails()) {
 			$errors = $validator->errors();
-
+			\Log::warning('VALIDACION FALLIDA:', $errors->toArray());
 			return redirect('/customer-admin/register-driver')->withErrors($validator)
 				->with('message_error', 'Debe completar los campos requeridos.')->withInput();
 		}
 
+		\Log::info('Validacion OK - procesando registro...');
+
 		try {
 			$userExist = \App\User::where('email',  $request->input('email'))->first();
+			\Log::info('Usuario existente: ' . ($userExist ? 'SI (ID:'.$userExist->id.')' : 'NO'));
 
 			if ($userExist) {
 
@@ -724,13 +729,21 @@ class MainController extends Controller
 				}
 			} else {
 
+				// Auto-generar contraseña si no fue enviada desde el formulario
+				$autoPassword = $request->input('password') ?: ($request->input('cellphone') . rand(1000, 9999));
+
 				// * Register User y Customer
 				$customer = \Customer::generateCustomer(null, $request->input('email'), [
 					'first_name' => $request->input('first_name'),
 					'last_name' => $request->input('last_name')
-				], $request->input('password'));
+				], $autoPassword);
+				\Log::info('Driver auto-password generated for: ' . $request->input('email'));
 
-				$user = $customer->user;
+				$user = $customer->fresh()->user;
+				if (!$user) {
+					\Log::error('generateCustomer no creó el User para email: ' . $request->input('email'));
+					return redirect('/customer-admin/register-driver')->with('message_error', 'Error al crear la cuenta de usuario. Intente nuevamente.')->withInput();
+				}
 				$user->name = $request->input('first_name') . ' ' . $request->input('last_name');
 
 				$user->first_name = $request->input('first_name');
@@ -742,17 +755,21 @@ class MainController extends Controller
 				$user->gender = isset($request->gender) ? $request->gender : 'male';
 				$user->image = \Asset::upload_image($request->file('image'), 'user-image', null);
 				$user->save();
+				\Log::info('Usuario guardado OK - ID: ' . $user->id);
 				$user->role_user()->detach(2);
 				$user->role_user()->attach(5);
 
 				$newDriver = $this->createDriver($request, $user);
+				\Log::info('Driver creado OK - ID: ' . $newDriver->id);
 
 				$this->driverVehicle($request, $newDriver->id);
-				// \App\User::where('id',$user->id )->update(['first_name'=> $request->input('first_name')]);
+				\Log::info('Vehiculo registrado OK para driver: ' . $newDriver->id);
+				\Log::info('========== REGISTRO COMPLETADO EXITOSAMENTE ==========');
 				return redirect('/customer-admin/register-driver/step3/');
 			}
 		} catch (\Throwable $th) {
-			\Log::info($th);
+			\Log::error('ERROR EN REGISTRO: ' . $th->getMessage());
+			\Log::error($th->getTraceAsString());
 			return redirect('/customer-admin/register-driver')->with('message_error', 'Ocurrió un error en el servidor. ' . $th->getMessage());
 		}
 	}
@@ -905,54 +922,63 @@ class MainController extends Controller
 			$newDriver->is_active_for_career = $request->input('is_active_for_career') !== null  ? true : true;
 			$newDriver->tic = $request->input('tic') !== null  ? $request->input('tic') : '';
 
-			// * IMAGENES 
-			$newDriver->image = \Asset::upload_image($request->file('image'), 'driver-image', null);
+			// * IMAGENES - Procesadas directamente
+			$imageFields = [
+				'image' => 'driver-image',
+				'license_front_image' => 'driver-license_front_image',
+				'license_back_image' => 'driver-license_back_image',
+				'ci_front_image' => 'driver-ci_front_image',
+				'ci_back_image' => 'driver-ci_back_image',
+				'ci_front_image_titular' => 'driver-ci_front_image_titular',
+				'ci_back_image_titular' => 'driver-ci_back_image_titular',
+				'tic_file' => 'driver-tic_file',
+			];
 
-			if (isset($request->license_front_image)) {
-				$newDriver->license_front_image = \Asset::upload_image($request->file('license_front_image'), 'driver-license_front_image', null);
-			} else {
-				$newDriver->license_front_image =  \Asset::upload_image(asset('assets/img/licence_front.jpg'), 'driver-license_front_image', null);
+			foreach ($imageFields as $field => $folder) {
+				if ($request->hasFile($field)) {
+					$file = $request->file($field);
+					\Log::info("Procesando {$field}: original={$file->getClientOriginalName()}, mime={$file->getMimeType()}, size={$file->getSize()}");
+					try {
+						$result = \Asset::upload_image($file, $folder, null);
+						if ($result) {
+							$newDriver->$field = $result;
+							\Log::info("{$field} subida OK via Asset: {$result}");
+						} else {
+							// Fallback: subir a S3 vía Storage::put
+							$ext = $file->getClientOriginalExtension() ?: 'jpg';
+							$filename = $folder . '_' . substr(str_shuffle("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"), 0, 20) . '.' . $ext;
+							$sizes = ['normal', 'mini'];
+							foreach ($sizes as $sizeCode) {
+								\Storage::put($folder . '/' . $sizeCode . '/' . $filename, file_get_contents($file->getRealPath()));
+							}
+							$newDriver->$field = $filename;
+							\Log::info("{$field} subida por fallback S3: {$filename}");
+						}
+					} catch (\Throwable $imgErr) {
+						\Log::error("{$field} error Asset: " . $imgErr->getMessage());
+						// Fallback: subir a S3 vía Storage::put
+						try {
+							$ext = $file->getClientOriginalExtension() ?: 'jpg';
+							$filename = $folder . '_' . substr(str_shuffle("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"), 0, 20) . '.' . $ext;
+							$sizes = ['normal', 'mini'];
+							foreach ($sizes as $sizeCode) {
+								\Storage::put($folder . '/' . $sizeCode . '/' . $filename, file_get_contents($file->getRealPath()));
+							}
+							$newDriver->$field = $filename;
+							\Log::info("{$field} subida por fallback S3 tras error: {$filename}");
+						} catch (\Throwable $s3Err) {
+							\Log::error("{$field} fallback S3 también falló: " . $s3Err->getMessage());
+						}
+					}
+				}
 			}
-
-			if (isset($request->license_back_image)) {
-				$newDriver->license_back_image = \Asset::upload_image($request->file('license_back_image'), 'driver-license_back_image', null);
-			} else {
-				$newDriver->license_back_image =  \Asset::upload_image(asset('assets/img/licence_back.jpeg'), 'driver-license_back_image', null);
-			}
-
-			$newDriver->license_back_image = \Asset::upload_image($request->file('license_back_image'), 'driver-license_back_image', null);
-			$newDriver->ci_back_image = \Asset::upload_image($request->file('ci_back_image'), 'driver-ci_back_image', null);
-			$newDriver->ci_front_image =  \Asset::upload_image($request->file('ci_front_image'), 'driver-ci_front_image', null);
-
-			if (isset($request->ci_front_image_titular)) {
-				$ci_front_image_titular =  \Asset::upload_image($request->file('ci_front_image_titular'), 'driver-ci_front_image_titular', null);
-				$ci_front_image =  \Asset::upload_image($request->file('ci_front_image'), 'driver-ci_front_image', null);
-			} else {
-				$ci_front_image_titular =  \Asset::upload_image(asset('assets/img/image_ci_anverso.jpeg'), 'driver-ci_front_image_titular', null);
-				$ci_front_image =  \Asset::upload_image(asset('assets/img/image_ci_anverso.jpeg'), 'driver-ci_front_image', null);
-			}
-			$newDriver->ci_front_image_titular = $ci_front_image_titular;
-			$newDriver->ci_front_image = $ci_front_image;
-
-			\Log::info("ci_reverso");
-
-			if (isset($request->ci_back_image_titular)) {
-				$ci_back_image_titular =  \Asset::upload_image($request->file('ci_back_image_titular'), 'driver-ci_back_image_titular', null);
-				$ci_back_image =  \Asset::upload_image($request->file('ci_back_image'), 'driver-ci_back_image', null);
-			} else {
-				$ci_back_image_titular =  \Asset::upload_image(asset('assets/img/image_ci_reverso.png'), 'driver-ci_back_image_titular', null);
-				$ci_back_image =  \Asset::upload_image(asset('assets/img/image_ci_reverso.png'), 'driver-ci_back_image', null);
-			}
-			$newDriver->ci_back_image_titular = $ci_back_image_titular;
-			$newDriver->ci_back_image = $ci_back_image;
-			//
-
-			$newDriver->tic_file =  $request->file('tic_file') !== null ? \Asset::upload_file($request->file('tic_file'), 'driver-tic_file', null) : null;
+			
 			$newDriver->save();
+			\Log::info("Driver creado y guardado con imágenes - ID: {$newDriver->id}");
 			return $newDriver;
 		} catch (\Throwable $th) {
-			echo $th;
-			return $th;
+			\Log::error('createDriver error: ' . $th->getMessage());
+			throw $th;
 		}
 	}
 
@@ -1006,8 +1032,8 @@ class MainController extends Controller
 			$newDriver->save();
 			return $newDriver;
 		} catch (\Throwable $th) {
-			echo $th;
-			return $th;
+			\Log::error('updateDriverModel error: ' . $th->getMessage());
+			throw $th;
 		}
 	}
 
@@ -1066,27 +1092,65 @@ class MainController extends Controller
 			$newVehicle->parent_id = $driverId != null || $driverId != '' ? $driverId : $request->input('driver_id');
 			$newVehicle->number_plate = $request->input('number_plate');
 			$newVehicle->vehicle_brand_id = $request->input('vehicle_brand_id');
-			$newVehicle->vehicle_model_id = $request->input('vehicle_model_id');
-			$newVehicle->type_vehicle = $request->input('type_vehicle'); //$type_vehicle;
+			$vehicleModelId = $request->input('vehicle_model_id');
+			$newVehicle->vehicle_model_id = (!empty($vehicleModelId)) ? $vehicleModelId : null;
 			$newVehicle->color = $request->input('color') !== null ? $request->input('color') : '#ffffff';
 			$newVehicle->model_year = $request->input('model_year') !== null ? $request->input('model_year') : '';
-			$newVehicle->type = $request->input('type') !== null ? $request->input('type') : 'vagoneta';
+			$validTypes = ['vagoneta', 'multiuso', 'convertible', 'descapotable'];
+			$typeInput = $request->input('type');
+			$newVehicle->type = in_array($typeInput, $validTypes) ? $typeInput : 'vagoneta';
 			$newVehicle->tmov = $request->input('tmov') !== null ? $request->input('tmov') : '';
 			$newVehicle->chassis_number = $request->input('chassis_number') !== null ? $request->input('chassis_number') : '';
 			$newVehicle->rua = $request->input('rua') !== null ? $request->input('rua') : 0;
 			$newVehicle->active = true;
 
-			if (isset($request->vehicle_image)) {
-				$newVehicle->vehicle_image = \Asset::upload_image($request->file('vehicle_image'), 'driver-vehicle-vehicle_image', null);
-			}
-			if (isset($request->side_image)) {
-				$newVehicle->side_image = \Asset::upload_image($request->file('side_image'), 'driver-vehicle-side_image', null);
+			// Imágenes del vehículo - procesadas directamente
+			$vehicleImageFields = [
+				'vehicle_image' => 'driver-vehicle-vehicle_image',
+				'side_image' => 'driver-vehicle-side_image',
+				'rua_image' => 'driver-vehicle-rua_image',
+			];
+
+			foreach ($vehicleImageFields as $field => $folder) {
+				if ($request->hasFile($field)) {
+					$file = $request->file($field);
+					\Log::info("Procesando vehiculo {$field}: original={$file->getClientOriginalName()}, mime={$file->getMimeType()}, size={$file->getSize()}");
+					try {
+						$result = \Asset::upload_image($file, $folder, null);
+						if ($result) {
+							$newVehicle->$field = $result;
+							\Log::info("Vehiculo {$field} subida OK: {$result}");
+						} else {
+							$ext = $file->getClientOriginalExtension() ?: 'jpg';
+							$filename = $folder . '_' . substr(str_shuffle("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"), 0, 20) . '.' . $ext;
+							$sizes = ['normal', 'mini'];
+							foreach ($sizes as $sizeCode) {
+								\Storage::put($folder . '/' . $sizeCode . '/' . $filename, file_get_contents($file->getRealPath()));
+							}
+							$newVehicle->$field = $filename;
+							\Log::info("Vehiculo {$field} subida por fallback S3: {$filename}");
+						}
+					} catch (\Throwable $imgErr) {
+						\Log::error("Vehiculo {$field} error: " . $imgErr->getMessage());
+						try {
+							$ext = $file->getClientOriginalExtension() ?: 'jpg';
+							$filename = $folder . '_' . substr(str_shuffle("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"), 0, 20) . '.' . $ext;
+							\Storage::put($folder . '/normal/' . $filename, file_get_contents($file->getRealPath()));
+							$newVehicle->$field = $filename;
+							\Log::info("Vehiculo {$field} subida por fallback S3 tras error: {$filename}");
+						} catch (\Throwable $s3Err) {
+							\Log::error("Vehiculo {$field} fallback S3 falló: " . $s3Err->getMessage());
+						}
+					}
+				}
 			}
 
-			$newVehicle->rua_image = $request->file('rua_image') !== null ? \Asset::upload_image($request->file('rua_image'), 'driver-vehicle-ruat_image', null) : null;
+			$newVehicle->save();
+			\Log::info("Vehiculo guardado OK - ID: {$newVehicle->id}, parent_id: {$driverId}");
 
-			return $newVehicle->save();
+			return true;
 		} catch (\Throwable $th) {
+			\Log::error("driverVehicle error: " . $th->getMessage());
 			echo $th;
 			return false;
 		}
@@ -1095,20 +1159,45 @@ class MainController extends Controller
 	public function modelByBrand($brandId)
 	{
 		try {
+			\Log::info('modelByBrand - Searching for brand ID: ' . $brandId);
+			
 			$models = \App\VehicleModel::where('vehicle_brand_id', $brandId)->get();
-			return ['status' => true, 'data' => $models];
+			
+			\Log::info('modelByBrand - Found ' . count($models) . ' models for brand ID: ' . $brandId);
+			
+			// Si no encuentra, loguear información
+			if (count($models) == 0) {
+				$all_brands = \App\VehicleModel::distinct()->pluck('vehicle_brand_id');
+				\Log::warning('modelByBrand - No models found. Available brand IDs: ' . json_encode($all_brands));
+			}
+			
+			return ['status' => true, 'message' => 'Modelos obtenidos con éxito', 'data' => $models];
 		} catch (\Throwable $th) {
-			return ['status' => false, 'message' => 'Ocurrio un error en el server',];
+			\Log::error('modelByBrand error: ' . $th->getMessage());
+			return ['status' => false, 'message' => 'Ocurrio un error en el server: ' . $th->getMessage()];
 		}
 	}
 
 	public function brandsByType($type)
 	{
 		try {
-			$brands = \App\VehicleBrand::where('type_vehicle', $type)->get();
-			return ['status' => true, 'data' => $brands];
+			\Log::info('brandsByType - Searching for type: ' . $type);
+			
+			// Buscar por el campo vehicle_type (no type_vehicle)
+			$brands = \App\VehicleBrand::where('vehicle_type', $type)->where('active', 1)->get();
+			
+			\Log::info('brandsByType - Found ' . count($brands) . ' brands for type: ' . $type);
+			
+			// Si no encuentra, loguear todos los tipos disponibles
+			if (count($brands) == 0) {
+				$all_types = \App\VehicleBrand::distinct()->pluck('vehicle_type');
+				\Log::warning('brandsByType - No brands found. Available types: ' . json_encode($all_types));
+			}
+			
+			return ['status' => true, 'message' => 'Marcas obtenidas con éxito', 'data' => $brands];
 		} catch (\Throwable $th) {
-			return ['status' => false, 'message' => 'Ocurrio un error en el server',];
+			\Log::error('brandsByType error: ' . $th->getMessage());
+			return ['status' => false, 'message' => 'Ocurrio un error en el server: ' . $th->getMessage()];
 		}
 	}
 
@@ -1251,8 +1340,10 @@ class MainController extends Controller
 	{
 		try {
 			$organizations = \App\Organization::where('city_id', $id)->where('type', 'company')->get();
+			\Log::info("organizationByCity - Found " . count($organizations) . " organizations for city: {$id}");
 			return ['status' => true, 'message' => 'Obtenido con éxito..', 'data' => $organizations];
 		} catch (\Throwable $th) {
+			\Log::error('organizationByCity error: ' . $th->getMessage());
 			return ['status' => false, 'message' => 'Ocurrió un error en el servidor. ' . $th->getMessage()];
 		}
 	}
@@ -1260,9 +1351,15 @@ class MainController extends Controller
 	public function citiesByRegion($id)
 	{
 		try {
-			$cities = \Solunes\Business\App\City::where('region_id', $id)->get();
+			// Obtener ciudades usando el modelo Solunes
+			// Nota: 'name' es un atributo traducido (Translatable), no exista en tabla cities
+			$cities = \Solunes\Business\App\City::where('region_id', $id)->where('active', 1)->get();
+			
+			\Log::info("citiesByRegion - Found " . count($cities) . " cities for region: {$id}");
+			
 			return ['status' => true, 'message' => 'Ciudades obtenidas con éxito.', 'data' => $cities];
 		} catch (\Throwable $th) {
+			\Log::error('citiesByRegion error: ' . $th->getMessage());
 			return ['status' => false, 'message' => 'Ocurrió un error en el servidor. ' . $th->getMessage()];
 		}
 	}

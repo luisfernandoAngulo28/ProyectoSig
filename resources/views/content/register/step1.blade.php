@@ -123,19 +123,40 @@
 
     <div class="loader" id="loader"></div>
 
-    <div class="content__form increment-text" style="height: 1000px" id="content-register">
-        <h3 class="title__form pb-1">Creación de tu Perfil</h3>
-        <p class="m-0" style="text-align: justify;">¡Hola! Bienvenido al registro de conductor para formar parte de
-            Andre, por favor
-            verifica que los campos estén correctamente llenados, toma en cuenta que revisaremos la información brindada
-            para habilitarte a la aplicación, te confirmaremos por correo electrónico.
+    <div class="content__form increment-text" id="content-register">
 
+        {{-- BARRA DE PROGRESO --}}
+        <div class="progress-top">
+            <div class="prog-step active">
+                <div class="prog-num">1</div>
+                <span>Tus datos</span>
+            </div>
+            <div class="prog-line"></div>
+            <div class="prog-step">
+                <div class="prog-num">2</div>
+                <span>Revisión</span>
+            </div>
+            <div class="prog-line"></div>
+            <div class="prog-step">
+                <div class="prog-num">3</div>
+                <span>Activación</span>
+            </div>
+        </div>
+
+        <h3 class="title__form pb-1" style="font-size:22px; font-weight:700; color:#1a3a4a;">Creación de tu Perfil</h3>
+        <p class="m-0" style="color:#64748b; font-size:14px; line-height:1.6;">
+            ¡Hola! Bienvenido al registro de conductor de AnDre. Completa todos los campos para que podamos verificar tu cuenta y habilitarte lo antes posible.
         </p>
 
-        <br>
-        <h3 class="title__form pb-1">Registro de datos personales</h3>
-        <p>(*) Campos obligatorios.</p>
-        <br>
+        <div class="section-header">
+            <div class="icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                </svg>
+            </div>
+            <h3>Datos Personales</h3>
+            <span class="required-note">(*) campos obligatorios</span>
+        </div>
 
         <form action="/customer-admin/register-driver/step1" method="POST" enctype="multipart/form-data" id="form-register">
             <div class="content__fields">
@@ -174,8 +195,7 @@
 
                 @include('includes.field', [
                     'id' => 'email',
-                    'label' =>
-                        'Email (*) (Entra a google en la parte de arriba en una esquina, con la inicial de una letra) ',
+                    'label' => 'Correo Electrónico (*)',
                     'name' => 'email',
                     'type' => 'email',
                     'hasError' => $errors->has('email'),
@@ -186,19 +206,7 @@
                     'required' => false,
                     'value' => old('email'),
                 ])
-                @include('includes.field', [
-                    'id' => 'password',
-                    'label' => 'Contraseña (*) (Crea tu Contraseña)',
-                    'name' => 'password',
-                    'type' => 'password',
-                    'hasError' => $errors->has('password'),
-                    'error' => $errors->first('password'),
-                    'fill' => false,
-                    'col_lg' => 'col-lg-6',
-                    'col_md' => 'col-md-6',
-                    'required' => false,
-                    'value' => old('password'),
-                ])
+                {{-- Contraseña eliminada del formulario: se auto-genera en el backend --}}
 
                 @include('includes.field', [
                     'id' => 'cellphone',
@@ -237,13 +245,8 @@
                     <label for="field__custom-city_id"><b class="label_font_size" style="font-size: 130%">Municipio (*)</b> <b style="color:red; font-weight: 400"
                             id="city_id"></b></label>
                     <div class="area__select">
-                        <select name="city_id" id="field__custom-city_id" onchange="getOrganizationByCity(event)" class="js-example-basic-single">
-                            <option value="" selected disabled>Seleccione una opción</option>
-                            @foreach ($cities as $city)
-                                <option value="{{ $city->id }}" {{ old('city_id') == $city->id ? 'selected' : '' }}>
-                                    {{ $city->name }}
-                                </option>
-                            @endforeach
+                        <select name="city_id" id="field__custom-city_id" class="js-example-basic-single">
+                            <option value="" selected disabled>Primero seleccione un Departamento</option>
                         </select>
                     </div>
                     @if ($errors->has('city_id'))
@@ -316,12 +319,7 @@
 
                     <div class="area__select">
                         <select name="organization_id" id="field__custom-organization_id" class="js-example-basic-single">
-                            <option value="" selected disabled>Seleccione una opción</option>
-                            @foreach ($organizations as $organization)
-                                <option value="{{ $organization->id }}"
-                                    {{ old('organization_id') == $organization->id ? 'selected' : '' }}>
-                                    {{ $organization->name }}</option>
-                            @endforeach
+                            <option value="" selected disabled>Primero seleccione un Municipio</option>
                         </select>
                     </div>
                     @if ($errors->has('organization_id'))
@@ -347,10 +345,25 @@
                     'value' => old('image'),
                 ])
 
-               {{--  @include('includes.field', [
+                {{-- RECORDATORIO FOTO DE PERFIL --}}
+                <div class="content__field col-lg-6 col-md-6 col-12" style="display: flex; align-items: center;">
+                    <div style="background: #fff8e1; border-left: 4px solid #f59e0b; border-radius: 6px; padding: 12px 16px; width: 100%; display:flex; gap:10px; align-items:flex-start;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;flex-shrink:0;margin-top:1px;">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                        <p style="margin: 0; font-size: 13px; color: #92400e;">
+                            <strong>Recordatorio:</strong> Debes actualizar tu <strong>Foto de Perfil</strong> el <strong>1ro de cada mes</strong> para mantener tu cuenta activa y verificada.
+                        </p>
+                    </div>
+                </div>
+
+                <div style="width: 100%; height: 1px; background: #e5e7eb; margin: 20px 0;"></div>
+
+                {{-- FOTO DEL BREVETE (FRENTE Y REVERSO JUNTOS) --}}
+                @include('includes.field', [
                     'id' => 'license_front_image',
-                    'label' => 'Imagen Frontal de la Licencia (*)',
-                    'subtext' => '<span></span>',
+                    'label' => 'Foto del Brevete / Licencia de Conducir - Frente (*)',
+                    'subtext' => '<span style="font-size:13px; color:#4b4b4b;">📷 Sube una foto clara de la parte frontal de tu brevete o licencia de conducir</span>',
                     'name' => 'license_front_image',
                     'type' => 'file',
                     'fill' => false,
@@ -364,8 +377,8 @@
 
                 @include('includes.field', [
                     'id' => 'license_back_image',
-                    'label' => 'Imagen del Reverso de la Licencia (*)',
-                    'subtext' => '<span></span>',
+                    'label' => 'Foto del Brevete / Licencia de Conducir - Reverso (*)',
+                    'subtext' => '<span style="font-size:13px; color:#4b4b4b;">📷 Sube una foto clara de la parte trasera de tu brevete o licencia de conducir</span>',
                     'name' => 'license_back_image',
                     'type' => 'file',
                     'fill' => false,
@@ -375,12 +388,15 @@
                     'hasError' => $errors->has('license_back_image'),
                     'error' => $errors->first('license_back_image'),
                     'value' => old('license_back_image'),
-                ])--}}
-                
-                {{-- @include('includes.field', [
+                ])
+
+                <div style="width: 100%; height: 1px; background: #e5e7eb; margin: 20px 0;"></div>
+
+                {{-- CI DEL CONDUCTOR (ANVERSO Y REVERSO JUNTOS) --}}
+                @include('includes.field', [
                     'id' => 'ci_front_image',
-                    'label' => 'Imagen Frontal del CI (*)',
-                    'subtext' => '<span></span>',
+                    'label' => 'Carnet de Identidad (CI) del Conductor - Anverso (*)',
+                    'subtext' => '<span style="font-size:13px; color:#4b4b4b;">📷 Sube una foto clara de la parte frontal de tu CI</span>',
                     'name' => 'ci_front_image',
                     'type' => 'file',
                     'fill' => false,
@@ -391,10 +407,11 @@
                     'error' => $errors->first('ci_front_image'),
                     'value' => old('ci_front_image'),
                 ])
+
                 @include('includes.field', [
                     'id' => 'ci_back_image',
-                    'label' => 'Imagen del Reverso del CI (*)',
-                    'subtext' => '<span></span>',
+                    'label' => 'Carnet de Identidad (CI) del Conductor - Reverso (*)',
+                    'subtext' => '<span style="font-size:13px; color:#4b4b4b;">📷 Sube una foto clara de la parte trasera de tu CI</span>',
                     'name' => 'ci_back_image',
                     'type' => 'file',
                     'fill' => false,
@@ -404,23 +421,11 @@
                     'hasError' => $errors->has('ci_back_image'),
                     'error' => $errors->first('ci_back_image'),
                     'value' => old('ci_back_image'),
-                ]) --}}
+                ])
 
-                {{-- @include('includes.field', [
-                    'id' => 'tic_file',
-                    'label' => 'Imagen Frontal de Documento TIC',
-                    'subtext' => '<span></span>',
-                    'name' => 'tic_file',
-                    'type' => 'file',
-                    'fill' => false,
-                    'required' => false,
-                    'col_lg' => 'col-lg-6',
-                    'col_md' => 'col-md-6',
-                    'hasError' => $errors->has('tic_file'),
-                    'error' => $errors->first('tic_file'),
-                    'value' => old('tic_file'),
-                ]) --}}
+                <div style="width: 100%; height: 1px; background: #e5e7eb; margin: 20px 0;"></div>
 
+                {{-- FEDERACIÓN Y NÚMERO DE INTERNO --}}
                 @include('includes.field', [
                     'id' => 'tic',
                     'label' => 'Nombre de Federación de Moto Taxi/ Auto Taxi',
@@ -450,7 +455,7 @@
                     'value' => old('license_number'),
                 ])
 
-              {{--  @include('includes.field', [
+                {{-- @include('includes.field', [
                     'id' => 'license_expiration_date',
                     'label' => 'Fecha de Expiración de la Licencia (*)',
                     'name' => 'license_expiration_date',
@@ -593,12 +598,14 @@
 
             </div>
 
-            <br>
-            <br>
-            <h3 class="title__form pb-1">Registra tu Vehículo Moto/Auto</h3>
-            <p>(*) Campos obligatorios.</p>
-
-            <br>
+            <div class="section-header">
+                <div class="icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h5l2 2-2 2h-5"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+                    </svg>
+                </div>
+                <h3>Datos del Vehículo</h3>
+            </div>
             <div class="content__fields">
 
                 {{-- <div class="content__field col-lg-6 col-md-6 col-12">
@@ -641,10 +648,9 @@
                 <div class="content__field col-lg-6 col-md-6 col-12">
                     <label for="field__custom-vehicle_brand_id"><b class="label_font_size" style="font-size: 130%">Marca de Vehiculo (*)</b> <b
                             style="color:red; font-weight: 400" id="vehicle_brand_id"></b></label>
-                    <span style="font-size: 14px; color:#4b4b4b;">Si la marca de tu vehículo no se encuentra en la lista,
-                        por favor comunícate con soporte.</span>
+                    <span style="font-size: 14px; color:#4b4b4b;">Selecciona tu marca o escríbela si no está en la lista.</span>
                     <div class="area__select">
-                        <select name="vehicle_brand_id" onchange="getModelsByBrand(event)" class="js-example-basic-single"
+                        <select name="vehicle_brand_id" onchange="onBrandChange(event)" class="js-example-basic-single"
                             id="field__custom-vehicle_brand_id">
                             <option value="" selected disabled>Seleccione una opción</option>
                             @foreach ($vehiclesBrands as $brand)
@@ -652,7 +658,15 @@
                                     {{ old('vehicle_brand_id') == $brand->id ? 'selected' : '' }}>{{ $brand->name }}
                                 </option>
                             @endforeach
+                            <option value="otra">Otra marca (escribir abajo)</option>
                         </select>
+                    </div>
+                    {{-- Campo para marca personalizada --}}
+                    <div id="custom_brand_container" style="display:none; margin-top: 10px;">
+                        <input type="text" name="custom_brand_name" id="custom_brand_name"
+                            placeholder="Escribe la marca de tu vehículo"
+                            style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:14px;"
+                            value="{{ old('custom_brand_name') }}">
                     </div>
                     @if ($errors->has('vehicle_brand_id'))
                         <p class="error__text">{{ $errors->first('vehicle_brand_id') }}</p>
@@ -773,10 +787,10 @@
                     @endif
                 </div>
 
-              {{--   @include('includes.field', [
+                @include('includes.field', [
                     'id' => 'vehicle_image',
-                    'label' => 'Sacar foto de la placa del Vehículo o Moto (*)',
-                    'subtext' => '<span></span>',
+                    'label' => 'Foto Delantera del Vehículo (*)',
+                    'subtext' => '<span style="font-size:13px; color:#4b4b4b;">📸 Toma una foto de la parte delantera de tu vehículo/moto</span>',
                     'name' => 'vehicle_image',
                     'type' => 'file',
                     'fill' => false,
@@ -790,8 +804,8 @@
 
                 @include('includes.field', [
                     'id' => 'side_image',
-                    'label' => 'Imagen de Costado del Vehículo o Moto',
-                    'subtext' => '<span></span>',
+                    'label' => 'Foto de Costado del Vehículo (*)',
+                    'subtext' => '<span style="font-size:13px; color:#4b4b4b;">📸 Toma una foto del costado de tu vehículo/moto</span>',
                     'name' => 'side_image',
                     'type' => 'file',
                     'fill' => false,
@@ -801,7 +815,7 @@
                     'hasError' => $errors->has('side_image'),
                     'error' => $errors->first('side_image'),
                     'value' => old('side_image'),
-                ])--}}
+                ])
 
 
                 {{-- <div class="content__field col-lg-6 col-md-6 col-sm-6 col-12">
@@ -867,67 +881,6 @@
                 @endif
             </div> --}}
 
-
-            {{-- <br>
-            <div class="content__fields">
-                @include('includes.field', [
-                    'id' => 'name_titular',
-                    'label' => 'Nombre del Titular',
-                    'name' => 'name_titular',
-                    'type' => 'text',
-                    'hasError' => $errors->has('name_titular'),
-                    'error' => $errors->first('name_titular'),
-                    'fill' => false,
-                    'col_lg' => 'col-lg-6',
-                    'col_md' => 'col-md-6',
-                    'required' => false,
-                    'value' => old('name_titular'),
-
-                ])
-                @include('includes.field', [
-                    'id' => 'ci_number_titular',
-                    'label' => 'Número de Carnet de Identidad del Titular',
-                    'name' => 'ci_number_titular',
-                    'type' => 'number',
-                    'hasError' => $errors->has('ci_number_titular'),
-                    'error' => $errors->first('ci_number_titular'),
-                    'fill' => false,
-                    'col_lg' => 'col-lg-6',
-                    'col_md' => 'col-md-6',
-                    'required' => false,
-                    'value' => old('ci_number_titular'),
-
-                ])
-                @include('includes.field', [
-                    'id' => 'ci_front_image_titular',
-                    'label' => 'Imagen Frontal del CI del Titular',
-                    'subtext' => '<span></span>',
-                    'name' => 'ci_front_image_titular',
-                    'type' => 'file',
-                    'fill' => false,
-                    'required' => false,
-                    'col_lg' => 'col-lg-6',
-                    'col_md' => 'col-md-6',
-                    'hasError' => $errors->has('ci_front_image_titular'),
-                    'error' => $errors->first('ci_front_image_titular'),
-                    'value' => old('ci_front_image_titular'),
-                ])
-                @include('includes.field', [
-                    'id' => 'ci_back_image_titular',
-                    'label' => 'Imagen del Reverso del CI del Titular',
-                    'subtext' => '<span></span>',
-                    'name' => 'ci_back_image_titular',
-                    'type' => 'file',
-                    'fill' => false,
-                    'required' => false,
-                    'col_lg' => 'col-lg-6',
-                    'col_md' => 'col-md-6',
-                    'hasError' => $errors->has('ci_back_image_titular'),
-                    'error' => $errors->first('ci_back_image_titular'),
-                    'value' => old('ci_back_image_titular'),
-                ])
-            </div> --}}
-
             {{-- FOOT --}}
             <br>
             <br>
@@ -958,55 +911,122 @@
 
 @section('script')
     <script>
+        console.log('%c[INIT] Page document ready - initializing Select2', 'color: green; font-weight: bold;');
+        
         $(document).ready(function() {
+            console.log('[READY] Document ready - setting up Select2 plugins');
             $('.select2_popup').select2({
                 dropdownParent: $('.modal__cap')
             });
             $('.select2_normal').select2();
+            console.log('[SUCCESS] Select2 initialized');
         });
     </script>
 
     <script>
-
            async function getBrandsByType(e) {
+            console.log('%c[DEBUG] getBrandsByType called', 'color: blue; font-weight: bold;', e);
             $('.loading__cap').addClass('show__loading');
-            const id = e.target.value;
+            
+            // Obtener el ID (compatible con eventos y elementos jQuery)
+            const id = (e && e.target) ? e.target.value : (e && e.val ? e.val() : e);
+            console.log('[DEBUG] Type ID:', id);
+            
             try {
                 const selectSubCategory = document.getElementById('field__custom-vehicle_brand_id');
+                if (!selectSubCategory) {
+                    throw new Error('Element field__custom-vehicle_brand_id not found');
+                }
+                
                 let html = '<option value="" selected disabled>Seleccione una opción</option>';
+                console.log('[INFO] Fetching brands from: /customer-admin/brands-by-type/' + id);
+                
                 const response = await fetch('/customer-admin/brands-by-type/' + id);
-                console.log(response)
+                console.log('[DEBUG] Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                
                 const data = await response.json();
-                Object.values(data.data).forEach(element => {
-                    html +=
-                        `<option value="${element.id}">${element.name}</option>`; 
-                });
+                console.log('%c[DEBUG] Brands response:', 'color: green;', data);
+                
+                if (data && data.data && Array.isArray(data.data) && data.data.length > 0) {
+                    console.log('[INFO] Found ' + data.data.length + ' brands');
+                    data.data.forEach(element => {
+                        html += `<option value="${element.id}">${element.name}</option>`; 
+                    });
+                } else {
+                    console.log('[WARNING] No brands data in response');
+                    html = '<option value="" disabled>No hay marcas disponibles</option>';
+                }
+                
                 selectSubCategory.innerHTML = html;
+                $(`#field__custom-vehicle_brand_id`).select2('destroy').select2();
+                console.log('[SUCCESS] Brands loaded successfully');
                 $('.loading__cap').removeClass('show__loading');
             } catch (error) {
-                console.log(error);
+                console.error('%c[ERROR] Loading brands:', 'color: red; font-weight: bold;', error);
+                const selectSubCategory = document.getElementById('field__custom-vehicle_brand_id');
+                if (selectSubCategory) {
+                    selectSubCategory.innerHTML = '<option value="" disabled>Error cargando marcas</option>';
+                }
                 $('.loading__cap').removeClass('show__loading');
             }
         }
 
 
         async function getModelsByBrand(e) {
+            console.log('%c[DEBUG] getModelsByBrand called', 'color: blue; font-weight: bold;', e);
             $('.loading__cap').addClass('show__loading');
-            const id = e.target.value;
+            
+            // Obtener el ID (compatible con eventos y elementos jQuery)
+            const id = (e && e.target) ? e.target.value : (e && e.val ? e.val() : e);
+            console.log('[DEBUG] Brand ID:', id);
+            
             try {
                 const selectSubCategory = document.getElementById('field__custom-vehicle_model_id');
+                
+                // Si el elemento no existe aún, simplemente retornar sin error
+                if (!selectSubCategory) {
+                    console.log('[WARNING] Element field__custom-vehicle_model_id not found yet - element may not be visible');
+                    $('.loading__cap').removeClass('show__loading');
+                    return;
+                }
+                
                 let html = '<option value="" selected disabled>Seleccione una opción</option>';
+                console.log('[INFO] Fetching models from: /customer-admin/models-by-brand/' + id);
+                
                 const response = await fetch('/customer-admin/models-by-brand/' + id);
-                console.log(response)
+                console.log('[DEBUG] Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                
                 const data = await response.json();
-                Object.values(data.data).forEach(element => {
-                    html +=
-                        `<option value="${element.id}">${element.name}</option>`; 
-                });
+                console.log('%c[DEBUG] Models response:', 'color: green;', data);
+                
+                if (data && data.data && Array.isArray(data.data) && data.data.length > 0) {
+                    console.log('[INFO] Found ' + data.data.length + ' models');
+                    data.data.forEach(element => {
+                        html += `<option value="${element.id}">${element.name}</option>`; 
+                    });
+                } else {
+                    console.log('[WARNING] No models data in response');
+                    html = '<option value="" disabled>No hay modelos disponibles</option>';
+                }
+                
                 selectSubCategory.innerHTML = html;
+                $(`#field__custom-vehicle_model_id`).select2('destroy').select2();
+                console.log('[SUCCESS] Models loaded successfully');
                 $('.loading__cap').removeClass('show__loading');
             } catch (error) {
-                console.log(error);
+                console.error('%c[ERROR] Loading models:', 'color: red; font-weight: bold;', error);
+                const selectSubCategory = document.getElementById('field__custom-vehicle_model_id');
+                if (selectSubCategory) {
+                    selectSubCategory.innerHTML = '<option value="" disabled>Error cargando modelos</option>';
+                }
                 $('.loading__cap').removeClass('show__loading');
             }
         }
@@ -1065,50 +1085,121 @@
     </script>
 
     <script>
-        async function getOrganizationByCity(e) {
-            const id = e.target.value;
+        console.log('%c[SCRIPT LOADED] Registration form script initialized', 'color: purple; font-weight: bold;');
+        
+        async function getOrganizationByCity(cityId) {
+            // Acepta tanto un evento como un ID directo
+            const id = (typeof cityId === 'object' && cityId.target) ? cityId.target.value : cityId;
             try {
-                const selectSubCategory = document.getElementById('field__custom-organization_id');
+                const selectOrg = document.getElementById('field__custom-organization_id');
                 let html = '<option value="" selected disabled>Seleccione una opción</option>';
                 const response = await fetch('/customer-admin/organization-by-city/' + id);
-
                 const data = await response.json();
-                Object.values(data.data).forEach(element => {
-                    html +=
-                        `<option value="${element.id}">${element.name}</option>`; // Added closing angle bracket >
-                });
-
-                selectSubCategory.innerHTML = html;
+                if (data.data && data.data.length > 0) {
+                    Object.values(data.data).forEach(element => {
+                        html += `<option value="${element.id}">${element.name}</option>`;
+                    });
+                } else {
+                    html = '<option value="" disabled>No hay empresas para este municipio</option>';
+                }
+                // Reinicializar Select2
+                $('#field__custom-organization_id').select2('destroy');
+                selectOrg.innerHTML = html;
+                $('#field__custom-organization_id').select2();
                 $('.loading__cap').removeClass('show__loading');
             } catch (error) {
-                console.log(error);
+                console.log('Error cargando empresas:', error);
                 $('.loading__cap').removeClass('show__loading');
             }
         }
 
         async function getCitiesByRegion(e) {
-            const id = e.target.value;
+            console.log('%c[DEBUG] getCitiesByRegion called', 'color: blue; font-weight: bold;', e);
+            
+            // Obtener el valor del select (compatible con eventos, jQuery y elementos DOM)
+            let id;
+            if (e instanceof jQuery) {
+                // Si es un elemento jQuery, obtener el valor directamente
+                id = e.val();
+                console.log('%c[DEBUG] Received jQuery element. Value:', 'color: blue;', id);
+            } else if (e && typeof e === 'object' && e.target) {
+                // Si es un evento, obtener el valor del target
+                id = $(e.target).val();
+                console.log('%c[DEBUG] Received event object. Value:', 'color: blue;', id);
+            } else {
+                // Si es un valor directo
+                id = e;
+                console.log('%c[DEBUG] Received value directly:', 'color: blue;', id);
+            }
+            
+            if (!id) {
+                console.log('[WARNING] No region ID found');
+                return;
+            }
+            
             try {
-                const selectCity = document.getElementById('field__custom-city_id');
-                let html = '<option value="" selected disabled>Seleccione una opción</option>';
-                const response = await fetch('/customer-admin/cities-by-region/' + id);
+                console.log('[INFO] Clearing city and organization selects...');
+                
+                // Limpiar municipio y empresa
+                $('#field__custom-city_id').select2('destroy');
+                document.getElementById('field__custom-city_id').innerHTML =
+                    '<option value="" selected disabled>Cargando municipios...</option>';
+                $('#field__custom-city_id').select2();
 
+                $('#field__custom-organization_id').select2('destroy');
+                document.getElementById('field__custom-organization_id').innerHTML =
+                    '<option value="" selected disabled>Primero seleccione un Municipio</option>';
+                $('#field__custom-organization_id').select2();
+
+                console.log('[INFO] Fetching cities from: /customer-admin/cities-by-region/' + id);
+                const response = await fetch('/customer-admin/cities-by-region/' + id);
+                
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                }
+                
                 const data = await response.json();
-                Object.values(data.data).forEach(element => {
-                    html +=
-                        `<option value="${element.id}">${element.name}</option>`; // Added closing angle bracket >
+                console.log('%c[DEBUG] Response data:', 'color: green;', data);
+
+                let html = '<option value="" selected disabled>Seleccione una opción</option>';
+                if (data.status === true && data.data && data.data.length > 0) {
+                    console.log('[INFO] Found ' + data.data.length + ' cities');
+                    Object.values(data.data).forEach(element => {
+                        html += `<option value="${element.id}">${element.name}</option>`;
+                    });
+                } else {
+                    console.log('[WARNING] No cities found for region ' + id);
+                    html = '<option value="" disabled>No hay municipios para este departamento</option>';
+                }
+
+                // Reinicializar Select2 con datos nuevos
+                console.log('[INFO] Reinitializing Select2 for cities...');
+                $('#field__custom-city_id').select2('destroy');
+                document.getElementById('field__custom-city_id').innerHTML = html;
+                const citySelect = $('#field__custom-city_id').select2();
+
+                // Cuando cambie el municipio → cargar empresas
+                citySelect.off('change.cascade').on('change.cascade', function() {
+                    const cityId = $(this).val();
+                    console.log('[DEBUG] City selected:', cityId);
+                    if (cityId) getOrganizationByCity(cityId);
                 });
 
-                selectCity.innerHTML = html;
+                console.log('[SUCCESS] Cities loaded successfully');
                 $('.loading__cap').removeClass('show__loading');
             } catch (error) {
-                console.log(error);
+                console.error('%c[ERROR] Loading cities:', 'color: red; font-weight: bold;', error);
+                document.getElementById('field__custom-city_id').innerHTML = 
+                    '<option value="" disabled>Error cargando municipios</option>';
                 $('.loading__cap').removeClass('show__loading');
             }
         }
     </script>
     <script>
         $('#form-register').on('submit', function(e) {
+            e.preventDefault();
+            console.log('%c[DEBUG] Form submitted - PREVENTING DEFAULT BEHAVIOR', 'color: blue; font-weight: bold;');
+            
             const firstName = $('#field__custom-first_name')
             const last_name = $('#field__custom-last_name')
             const email = $('#field__custom-email')
@@ -1150,6 +1241,79 @@
             const field__custom_ci_exp = $('#field__custom-ci_exp')
 
             const color = $('#select-color')
+            
+            console.log('%c[DEBUG] Form data:', 'color: green;', {
+                email: email.val(),
+                first_name: firstName.val(),
+                last_name: last_name.val(),
+                cellphone: cellphone.val(),
+                region_id: field__custom_driver_city_id.val(),
+                city_id: field__custom_city_id.val(),
+                organization_id: field__custom_organization_id.val()
+            });
+            
+            console.log('%c[INFO] Form will be submitted via AJAX now', 'color: orange;');
+            
+            try {
+                console.log('%c[DEBUG] Getting form element...', 'color: blue;');
+                const formElement = document.getElementById('form-register');
+                console.log('%c[DEBUG] Form element found:', 'color: blue;', formElement);
+                
+                if (!formElement) {
+                    throw new Error('Form element not found!');
+                }
+                
+                console.log('%c[DEBUG] Creating FormData...', 'color: blue;');
+                const formData = new FormData(formElement);
+                console.log('%c[DEBUG] FormData created successfully', 'color: blue;');
+                
+                console.log('%c[INFO] Sending FormData to /customer-admin/register-driver/step1', 'color: purple;');
+                
+                // Enviar por AJAX
+                $.ajax({
+                    url: '/customer-admin/register-driver/step1',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    timeout: 30000,
+                    success: function(response, status, xhr) {
+                        console.log('%c[SUCCESS] Request completed!', 'color: green; font-weight: bold;', {
+                            status: status,
+                            statusCode: xhr.status
+                        });
+                        console.log('%c[INFO] Redirecting to step3...', 'color: purple;');
+                        window.location.href = '/customer-admin/register-driver/step3/';
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('%c[ERROR] Registration failed:', 'color: red; font-weight: bold;', {
+                            status: xhr.status,
+                            statusText: xhr.statusText,
+                            responseText: xhr.responseText,
+                            error: error,
+                            timeout: status === 'timeout'
+                        });
+                        
+                        let errorMessage = error;
+                        if (xhr.status === 422 || xhr.status === 400) {
+                            try {
+                                const jsonResponse = JSON.parse(xhr.responseText);
+                                errorMessage = jsonResponse.message || Object.values(jsonResponse.errors || {}).flat().join(', ');
+                            } catch (e) {
+                                errorMessage = xhr.responseText;
+                            }
+                        }
+                        
+                        alert('Error al registrar: ' + errorMessage);
+                    }
+                });
+                
+            } catch (error) {
+                console.error('%c[CRITICAL ERROR]', 'color: red; font-weight: bold;', error);
+                alert('Error crítico: ' + error.message);
+            }
+            
+            return false;
 
             // try {
             //     validEmpty(firstName, 'first_name', e)
@@ -1227,8 +1391,36 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         $(document).ready(function() {
+            console.log('[READY] Initializing main form Select2 controls');
             $('.js-example-basic-single').select2();
+            console.log('[SUCCESS] Main Select2 controls initialized');
+            
+            // Evento para cargar municipios cuando cambia departamento (Select2)
+            const regionSelect = $('#field__custom-driver-region_id');
+            console.log('[DEBUG] Setting up region change listener. Element exists:', regionSelect.length > 0);
+            
+            regionSelect.on('change.select2', function(e) {
+                console.log('[EVENT] Region changed via Select2. Value:', $(this).val());
+                // Pasar el elemento jQuery directamente en lugar de un evento falso
+                getCitiesByRegion($(this));
+            });
+            
+            console.log('[SUCCESS] Region change listener attached');
         });
+
+        // Mostrar campo de marca personalizada si selecciona "Otra"
+        function onBrandChange(event) {
+            const val = event.target.value;
+            const container = document.getElementById('custom_brand_container');
+            if (val === 'otra') {
+                container.style.display = 'block';
+                document.getElementById('custom_brand_name').setAttribute('required', 'required');
+            } else {
+                container.style.display = 'none';
+                document.getElementById('custom_brand_name').removeAttribute('required');
+            }
+            getModelsByBrand(event);
+        }
         // document.getElementById('field__custom-number_of_passengers').addEventListener('keyup', function(e) {
         //     if (e.target.value > 99) {
         //         $(`#number_of_passengers`).text('Rango de valores 0 - 99');

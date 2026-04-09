@@ -337,6 +337,11 @@ Route::group(['prefix' => 'api-auth'], function(){
 		Route::post('approve-driver', 'Auth\AuthenticateController@approveDriver');
 	});
 
+	// Endpoints de catálogos para dropdowns (públicos, sin autenticación)
+	Route::get('regions',       'Auth\AuthenticateController@getRegions');
+	Route::get('cities',        'Auth\AuthenticateController@getCitiesByRegion');
+	Route::get('organizations', 'Auth\AuthenticateController@getOrganizationsByCity');
+
 });
 
 // Cambiamos el grupo de v1 a rutas estándar de Laravel para mayor confiabilidad en el servidor AWS
