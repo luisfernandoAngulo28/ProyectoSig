@@ -1903,50 +1903,58 @@ class AuthenticateController extends Controller {
      */
     private function checkFacialPhotoStatus($driver)
     {
+        // ✅ Verificar si las columnas existen antes de usarlas
+        $hasFacialColumns = \Schema::hasColumn('drivers', 'facial_photo_updated_at')
+                         && \Schema::hasColumn('drivers', 'facial_photo_blocked');
+
+        // Si la tabla no tiene estas columnas aún (migración pendiente), retornar estado neutral
+        if (!$hasFacialColumns) {
+            return [
+                'needs_update'     => false,
+                'is_expired'       => false,
+                'days_remaining'   => 30,
+                'blocked'          => false,
+                'next_update_date' => null,
+                'message'          => ''
+            ];
+        }
+
         $lastUpdate = $driver->facial_photo_updated_at;
-        $isBlocked = $driver->facial_photo_blocked == 1;
+        $isBlocked  = $driver->facial_photo_blocked == 1;
         
         // Si no tiene fecha de actualización, considerar la fecha de registro
         if (!$lastUpdate && $driver->created_at) {
             $lastUpdate = $driver->created_at;
-            // Actualizar el campo para futuros checks
-            $driver->facial_photo_updated_at = $driver->created_at;
-            $driver->save();
         }
         
         // Si aún no tiene fecha, es nueva cuenta sin foto
         if (!$lastUpdate) {
             return [
-                'needs_update' => true,
-                'is_expired' => true,
-                'days_remaining' => 0,
-                'blocked' => false,
+                'needs_update'     => true,
+                'is_expired'       => true,
+                'days_remaining'   => 0,
+                'blocked'          => false,
                 'next_update_date' => null,
-                'message' => 'Debes subir tu foto de perfil'
+                'message'          => 'Debes subir tu foto de perfil'
             ];
         }
         
         // Calcular días desde la última actualización
-        $lastUpdateDate = new \DateTime($lastUpdate);
-        $now = new \DateTime();
-        $daysSinceUpdate = $now->diff($lastUpdateDate)->days;
+        $lastUpdateDate   = new \DateTime($lastUpdate);
+        $now              = new \DateTime();
+        $daysSinceUpdate  = $now->diff($lastUpdateDate)->days;
         
-        // 30 días = plazo total
-        // 25 días = enviar recordatorio (5 días antes)
-        // 30+ días = bloquear
-        
-        $daysRemaining = 30 - $daysSinceUpdate;
-        $needsUpdate = $daysSinceUpdate >= 25; // Mostrar aviso desde el día 25
-        $isExpired = $daysSinceUpdate >= 30;
+        $daysRemaining  = 30 - $daysSinceUpdate;
+        $needsUpdate    = $daysSinceUpdate >= 25;
+        $isExpired      = $daysSinceUpdate >= 30;
         $nextUpdateDate = date('Y-m-d', strtotime($lastUpdate . ' +30 days'));
         
         // Auto-bloquear si ha pasado más de 30 días
         if ($isExpired && !$isBlocked) {
-            $driver->facial_photo_blocked = 1;
-            $driver->save();
+            \DB::table('drivers')->where('id', $driver->id)->update([
+                'facial_photo_blocked' => 1,
+            ]);
             $isBlocked = true;
-            
-            // Enviar notificación de bloqueo
             $this->sendFacialPhotoBlockedNotification($driver);
         }
         
