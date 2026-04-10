@@ -337,6 +337,82 @@ Route::group(['prefix' => 'api-auth'], function(){
 		Route::post('approve-driver', 'Auth\AuthenticateController@approveDriver');
 	});
 
+	// ============================================================
+	// Endpoint para subir QR de cobros del conductor
+	// POST /api-auth/upload-driver-qr
+	// ============================================================
+	Route::group(['middleware' => ['jwt.auth']], function(){
+		Route::post('upload-driver-qr', function(\Illuminate\Http\Request $request){
+			try {
+				// Obtener conductor autenticado
+				$user = \JWTAuth::parseToken()->authenticate();
+				if (!$user) {
+					return response()->json(['status' => false, 'message' => 'No autenticado'], 401);
+				}
+
+				// Buscar el registro de conductor
+				$driver = \App\Driver::where('user_id', $user->id)
+					->orWhere('id', $user->id)
+					->first();
+
+				if (!$driver) {
+					return response()->json(['status' => false, 'message' => 'Conductor no encontrado'], 404);
+				}
+
+				if (!$request->hasFile('qr_image')) {
+					return response()->json(['status' => false, 'message' => 'No se recibió ninguna imagen'], 400);
+				}
+
+				$file = $request->file('qr_image');
+
+				// Validar que sea imagen
+				if (!in_array($file->getMimeType(), ['image/jpeg', 'image/png', 'image/gif', 'image/webp'])) {
+					return response()->json(['status' => false, 'message' => 'El archivo debe ser una imagen (jpg, png, gif)'], 400);
+				}
+
+				// Crear carpeta si no existe
+				$qrDir = public_path('drivers/qr');
+				if (!file_exists($qrDir)) {
+					mkdir($qrDir, 0755, true);
+				}
+
+				// Eliminar QR anterior si existe
+				if ($driver->qr_image) {
+					$oldPath = public_path($driver->qr_image);
+					if (file_exists($oldPath)) {
+						@unlink($oldPath);
+					}
+				}
+
+				// Guardar nueva imagen
+				$ext = $file->getClientOriginalExtension() ?: 'png';
+				$fileName = 'qr_' . $driver->id . '_' . time() . '.' . $ext;
+				$file->move($qrDir, $fileName);
+				$relativePath = 'drivers/qr/' . $fileName;
+
+				// Actualizar en base de datos
+				\DB::table('drivers')->where('id', $driver->id)->update([
+					'qr_image' => $relativePath,
+					'updated_at' => date('Y-m-d H:i:s'),
+				]);
+
+				\Log::info("QR actualizado: driver {$driver->id} → {$relativePath}");
+
+				return response()->json([
+					'status' => true,
+					'message' => 'Código QR actualizado exitosamente',
+					'data' => [
+						'qr_image' => url($relativePath),
+					]
+				], 200);
+
+			} catch (\Exception $e) {
+				\Log::error('Error en upload-driver-qr: ' . $e->getMessage());
+				return response()->json(['status' => false, 'message' => 'Error al subir el QR: ' . $e->getMessage()], 500);
+			}
+		});
+	}); // fin grupo jwt.auth upload-driver-qr
+
 	// Endpoints de catálogos para dropdowns (públicos, sin autenticación)
 	Route::get('regions',       'Auth\AuthenticateController@getRegions');
 	Route::get('cities',        'Auth\AuthenticateController@getCitiesByRegion');
@@ -525,7 +601,9 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'Api'],
 				'driver_rating_total' => '5.0', 
 				'rides_total' => '0',
 				'drivers_image' => (strpos($driver->image, 'http') === 0) ? $driver->image : url($driver->image),
-				'qr_image' => $driver->qr_image,
+				'qr_image' => $driver->qr_image
+                    ? ((strpos($driver->qr_image, 'http') === 0) ? $driver->qr_image : url($driver->qr_image))
+                    : null,
 			];
 			
 			// Verificamos vehículos usando DB::table
