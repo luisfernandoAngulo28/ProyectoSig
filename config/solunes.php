@@ -108,4 +108,8 @@ return [
 	'filter_suboptions_exceptions' => [],
 	'delete_item_custom_message' => false,
 
+	// CUSTOM HOOKS
+	'item_form_add_html_after_form' => true,
+	'item_form_add_html_before_button' => true,
+
 ];

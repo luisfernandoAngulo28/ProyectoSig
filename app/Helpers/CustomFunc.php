@@ -978,4 +978,98 @@ class CustomFunc
         }
         return $items;
     }
+
+    public static function item_form_add_html_after_form($module, $model, $action, $files, $fields, $i) {
+        if ($model == "driver" && $i && $i->id) {
+            $driver = $i;
+            $user = \App\User::find($driver->user_id);
+            $vehicles = \App\DriverVehicle::where('parent_id', $driver->id)->with(['vehicle_brand', 'vehicle_model'])->get();
+            $isApproved = $user && $user->is_verify;
+
+            $html = '<div style="margin-top:30px; border:2px solid #7c4dff; border-radius:10px; padding:25px; background:#fafafe;">';
+
+            // Status
+            $html .= '<div style="text-align:center; margin-bottom:20px;">';
+            $html .= '<h3 style="color:#333;">Estado del Conductor</h3>';
+            if ($isApproved) {
+                $html .= '<span style="display:inline-block;padding:8px 20px;background:#d4edda;color:#155724;border-radius:20px;font-weight:bold;font-size:16px;">APROBADO</span>';
+            } else {
+                $html .= '<span style="display:inline-block;padding:8px 20px;background:#fff3cd;color:#856404;border-radius:20px;font-weight:bold;font-size:16px;">PENDIENTE DE APROBACION</span>';
+            }
+            $html .= '</div>';
+
+            // Images section
+            $html .= '<h3 style="color:#7c4dff; border-bottom:2px solid #7c4dff; padding-bottom:8px; margin-bottom:15px;">Documentos e Imagenes del Conductor</h3>';
+            $imageFields = [
+                ['field' => 'image', 'label' => 'Foto de Perfil', 'folder' => 'driver-image'],
+                ['field' => 'license_front_image', 'label' => 'Licencia (Frente)', 'folder' => 'driver-license_front_image'],
+                ['field' => 'license_back_image', 'label' => 'Licencia (Reverso)', 'folder' => 'driver-license_back_image'],
+                ['field' => 'ci_front_image', 'label' => 'CI (Anverso)', 'folder' => 'driver-ci_front_image'],
+                ['field' => 'ci_back_image', 'label' => 'CI (Reverso)', 'folder' => 'driver-ci_back_image'],
+            ];
+            $html .= '<div style="display:flex; flex-wrap:wrap; gap:15px; margin-bottom:20px;">';
+            foreach ($imageFields as $imgField) {
+                $fn = $imgField['field'];
+                $val = $driver->$fn;
+                if ($val && $val !== '0' && $val !== 0 && $val !== false) {
+                    $imgUrl = \Storage::url($imgField['folder'] . '/normal/' . $val);
+                    $html .= '<div style="text-align:center; background:#fff; padding:10px; border-radius:8px; border:1px solid #ddd; min-width:180px;">';
+                    $html .= '<p style="font-weight:bold; margin-bottom:5px; font-size:13px; color:#555;">' . $imgField['label'] . '</p>';
+                    $html .= '<a href="' . e($imgUrl) . '" target="_blank"><img src="' . e($imgUrl) . '" style="max-width:200px; max-height:160px; border-radius:6px;" onerror="this.parentElement.innerHTML=\'<span style=color:#ccc>Sin imagen</span>\'"></a>';
+                    $html .= '</div>';
+                }
+            }
+            $html .= '</div>';
+
+            // Vehicle images
+            if (count($vehicles) > 0) {
+                $html .= '<h4 style="color:#7c4dff; margin-top:15px;">Imagenes de Vehiculos</h4>';
+                $html .= '<div style="display:flex; flex-wrap:wrap; gap:15px; margin-bottom:20px;">';
+                foreach ($vehicles as $v) {
+                    $vehImgs = [
+                        ['field'=>'vehicle_image', 'label'=>'Vehiculo (' . ($v->number_plate ?: 'S/P') . ')', 'folder'=>'driver-vehicle-vehicle_image'],
+                        ['field'=>'side_image', 'label'=>'Lateral (' . ($v->number_plate ?: 'S/P') . ')', 'folder'=>'driver-vehicle-side_image'],
+                        ['field'=>'rua_image', 'label'=>'RUAT (' . ($v->number_plate ?: 'S/P') . ')', 'folder'=>'driver-vehicle-rua_image'],
+                    ];
+                    foreach ($vehImgs as $vImg) {
+                        $fn = $vImg['field'];
+                        $vv = $v->$fn;
+                        if ($vv && $vv !== '0' && $vv !== 0 && $vv !== false) {
+                            $vImgUrl = \Storage::url($vImg['folder'] . '/normal/' . $vv);
+                            $html .= '<div style="text-align:center; background:#fff; padding:10px; border-radius:8px; border:1px solid #ddd; min-width:180px;">';
+                            $html .= '<p style="font-weight:bold; margin-bottom:5px; font-size:13px; color:#555;">' . $vImg['label'] . '</p>';
+                            $html .= '<a href="' . e($vImgUrl) . '" target="_blank"><img src="' . e($vImgUrl) . '" style="max-width:200px; max-height:160px; border-radius:6px;" onerror="this.parentElement.innerHTML=\'<span style=color:#ccc>Sin imagen</span>\'"></a>';
+                            $html .= '</div>';
+                        }
+                    }
+                }
+                $html .= '</div>';
+            }
+
+            // Approve/Reject
+            $html .= '<div style="text-align:center; margin-top:20px; padding-top:20px; border-top:2px dashed #7c4dff;">';
+            $html .= '<h4 style="margin-bottom:15px;">Accion de Aprobacion</h4>';
+            if (!$isApproved) {
+                $html .= '<p style="color:#666; margin-bottom:15px;">Revise los datos y documentos. Si todo esta correcto, apruebe el registro.</p>';
+                $hasVeh = count($vehicles) > 0;
+                if (!$hasVeh) {
+                    $html .= '<p style="color:red; font-weight:bold; margin-bottom:10px;">No se puede aprobar: debe tener al menos un vehiculo.</p>';
+                }
+                $ds = !$hasVeh ? 'pointer-events:none; opacity:0.5;' : '';
+                $html .= '<a href="/customer-admin/approve-driver/' . $driver->id . '" onclick="return confirm(\'Aprobar a este conductor? Podra usar la app.\')" style="display:inline-block; padding:12px 30px; background:#28a745; color:#fff; border-radius:5px; text-decoration:none; font-weight:bold; font-size:16px; margin-right:10px;' . $ds . '">Aprobar Conductor</a>';
+                $html .= '<a href="/customer-admin/reject-driver/' . $driver->id . '" onclick="return confirm(\'Rechazar a este conductor?\')" style="display:inline-block; padding:12px 30px; background:#dc3545; color:#fff; border-radius:5px; text-decoration:none; font-weight:bold; font-size:16px;">Rechazar / Bloquear</a>';
+            } else {
+                $html .= '<p style="color:#155724; font-size:18px;">Este conductor ya esta <strong>APROBADO</strong>.</p>';
+                $html .= '<a href="/customer-admin/reject-driver/' . $driver->id . '" onclick="return confirm(\'Bloquear a este conductor?\')" style="display:inline-block; padding:10px 25px; background:#dc3545; color:#fff; border-radius:5px; text-decoration:none; margin-top:10px;">Bloquear Conductor</a>';
+            }
+            $html .= '</div>';
+            $html .= '</div>';
+            return $html;
+        }
+        return "";
+    }
+
+    public static function item_form_add_html_before_button($module, $model, $action, $files, $fields, $i) {
+        return "";
+    }
 }
