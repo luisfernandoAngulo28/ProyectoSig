@@ -170,7 +170,7 @@
                     'fill' => false,
                     'col_lg' => 'col-lg-6',
                     'col_md' => 'col-md-6',
-                    'required' => false,
+                    'required' => true,
                     'value' => old('first_name'),
                 ])
                 {{-- <label for="">ola</label> --}}
@@ -189,7 +189,7 @@
                     'fill' => false,
                     'col_lg' => 'col-lg-6',
                     'col_md' => 'col-md-6',
-                    'required' => false,
+                    'required' => true,
                     'value' => old('last_name'),
                 ])
 
@@ -203,7 +203,7 @@
                     'fill' => false,
                     'col_lg' => 'col-lg-6',
                     'col_md' => 'col-md-6',
-                    'required' => false,
+                    'required' => true,
                     'value' => old('email'),
                 ])
                 {{-- Contraseña eliminada del formulario: se auto-genera en el backend --}}
@@ -218,7 +218,7 @@
                     'fill' => false,
                     'col_lg' => 'col-lg-6',
                     'col_md' => 'col-md-6',
-                    'required' => false,
+                    'required' => true,
                     'value' => old('cellphone'),
                 ])
 
@@ -337,7 +337,7 @@
                     'name' => 'image',
                     'type' => 'file',
                     'fill' => false,
-                    'required' => false,
+                    'required' => true,
                     'col_lg' => 'col-lg-6',
                     'col_md' => 'col-md-6',
                     'hasError' => $errors->has('image'),
@@ -367,7 +367,7 @@
                     'name' => 'license_front_image',
                     'type' => 'file',
                     'fill' => false,
-                    'required' => false,
+                    'required' => true,
                     'col_lg' => 'col-lg-6',
                     'col_md' => 'col-md-6',
                     'hasError' => $errors->has('license_front_image'),
@@ -382,7 +382,7 @@
                     'name' => 'license_back_image',
                     'type' => 'file',
                     'fill' => false,
-                    'required' => false,
+                    'required' => true,
                     'col_lg' => 'col-lg-6',
                     'col_md' => 'col-md-6',
                     'hasError' => $errors->has('license_back_image'),
@@ -400,7 +400,7 @@
                     'name' => 'ci_front_image',
                     'type' => 'file',
                     'fill' => false,
-                    'required' => false,
+                    'required' => true,
                     'col_lg' => 'col-lg-6',
                     'col_md' => 'col-md-6',
                     'hasError' => $errors->has('ci_front_image'),
@@ -415,7 +415,7 @@
                     'name' => 'ci_back_image',
                     'type' => 'file',
                     'fill' => false,
-                    'required' => false,
+                    'required' => true,
                     'col_lg' => 'col-lg-6',
                     'col_md' => 'col-md-6',
                     'hasError' => $errors->has('ci_back_image'),
@@ -704,7 +704,7 @@
                     'fill' => false,
                     'col_lg' => 'col-lg-6',
                     'col_md' => 'col-md-6',
-                    'required' => false,
+                    'required' => true,
                     'value' => old('number_plate'),
                 ]) 
 
@@ -794,7 +794,7 @@
                     'name' => 'vehicle_image',
                     'type' => 'file',
                     'fill' => false,
-                    'required' => false,
+                    'required' => true,
                     'col_lg' => 'col-lg-6',
                     'col_md' => 'col-md-6',
                     'hasError' => $errors->has('vehicle_image'),
@@ -809,7 +809,7 @@
                     'name' => 'side_image',
                     'type' => 'file',
                     'fill' => false,
-                    'required' => false,
+                    'required' => true,
                     'col_lg' => 'col-lg-6',
                     'col_md' => 'col-md-6',
                     'hasError' => $errors->has('side_image'),
@@ -1253,6 +1253,47 @@
             });
             
             console.log('%c[INFO] Form will be submitted via AJAX now', 'color: orange;');
+            
+            // Validación de campos obligatorios
+            var camposVacios = [];
+            var camposConError = [];
+            
+            // --- Datos Personales ---
+            if (!firstName.val() || !firstName.val().trim()) { camposVacios.push('Nombres'); camposConError.push(firstName); }
+            if (!last_name.val() || !last_name.val().trim()) { camposVacios.push('Apellidos'); camposConError.push(last_name); }
+            if (!email.val() || !email.val().trim()) { camposVacios.push('Correo Electrónico'); camposConError.push(email); }
+            if (!cellphone.val() || !cellphone.val().trim()) { camposVacios.push('Número de Celular'); camposConError.push(cellphone); }
+            
+            // --- Departamento y Ciudad ---
+            if (!$('#field__custom-driver-region_id').val()) camposVacios.push('Departamento');
+            if (!$('#field__custom-city_id').val()) camposVacios.push('Municipio');
+            
+            // --- Documentos del conductor ---
+            if (!image[0] || !image[0].files || !image[0].files.length) camposVacios.push('Foto de Perfil');
+            if (!license_front_image[0] || !license_front_image[0].files || !license_front_image[0].files.length) camposVacios.push('Brevete / Licencia - Frente');
+            if (!license_back_image[0] || !license_back_image[0].files || !license_back_image[0].files.length) camposVacios.push('Brevete / Licencia - Reverso');
+            if (!ci_front_image[0] || !ci_front_image[0].files || !ci_front_image[0].files.length) camposVacios.push('CI - Anverso');
+            if (!ci_back_image[0] || !ci_back_image[0].files || !ci_back_image[0].files.length) camposVacios.push('CI - Reverso');
+            
+            // --- Datos del Vehículo ---
+            if (!$('#field__custom-type_vehicle').val()) camposVacios.push('Tipo de Vehículo');
+            if (!$('#field__custom-vehicle_brand_id').val()) camposVacios.push('Marca de Vehículo');
+            if (!$('#field__custom-number_plate').val() || !$('#field__custom-number_plate').val().trim()) { camposVacios.push('Número de Placa'); camposConError.push($('#field__custom-number_plate')); }
+            if (!vehicle_image[0] || !vehicle_image[0].files || !vehicle_image[0].files.length) camposVacios.push('Foto Delantera del Vehículo');
+            if (!side_image[0] || !side_image[0].files || !side_image[0].files.length) camposVacios.push('Foto de Costado del Vehículo');
+            
+            if (camposVacios.length > 0) {
+                alert('Por favor complete los siguientes campos obligatorios:\n\n- ' + camposVacios.join('\n- '));
+                // Marcar campos de texto vacíos con borde rojo
+                camposConError.forEach(function(campo) { campo.css('border', '2px solid red'); });
+                // Scroll al primer campo con error
+                if (camposConError.length > 0) {
+                    $('html, body').animate({ scrollTop: camposConError[0].offset().top - 100 }, 500);
+                }
+                return false;
+            }
+            // Limpiar bordes rojos si todo está bien
+            camposConError.forEach(function(campo) { campo.css('border', ''); });
             
             try {
                 console.log('%c[DEBUG] Getting form element...', 'color: blue;');

@@ -413,6 +413,71 @@ Route::group(['prefix' => 'api-auth'], function(){
 		});
 	}); // fin grupo jwt.auth upload-driver-qr
 
+	// ============================================================
+	// Endpoint para subir FOTO DE PERFIL del conductor
+	// POST /api-auth/upload-driver-photo
+	// ============================================================
+	Route::group(['middleware' => ['jwt.auth']], function(){
+		Route::post('upload-driver-photo', function(\Illuminate\Http\Request $request){
+			try {
+				$user = \JWTAuth::parseToken()->authenticate();
+				if (!$user) {
+					return response()->json(['status' => false, 'message' => 'No autenticado'], 401);
+				}
+
+				$driver = \App\Driver::where('user_id', $user->id)->orWhere('id', $user->id)->first();
+				if (!$driver) {
+					return response()->json(['status' => false, 'message' => 'Conductor no encontrado'], 404);
+				}
+
+				if (!$request->hasFile('driver_photo')) {
+					return response()->json(['status' => false, 'message' => 'No se recibió ninguna imagen'], 400);
+				}
+
+				$file = $request->file('driver_photo');
+
+				if (!in_array($file->getMimeType(), ['image/jpeg', 'image/png', 'image/gif', 'image/webp'])) {
+					return response()->json(['status' => false, 'message' => 'El archivo debe ser una imagen'], 400);
+				}
+
+				// Crear directorio si no existe
+				$photoDir = public_path('drivers/photos');
+				if (!file_exists($photoDir)) {
+					mkdir($photoDir, 0755, true);
+				}
+
+				// Eliminar foto anterior
+				if ($driver->image && file_exists(public_path($driver->image))) {
+					@unlink(public_path($driver->image));
+				}
+
+				$ext = $file->getClientOriginalExtension() ?: 'jpg';
+				$fileName = 'photo_' . $driver->id . '_' . time() . '.' . $ext;
+				$file->move($photoDir, $fileName);
+				$relativePath = 'drivers/photos/' . $fileName;
+
+				\DB::table('drivers')->where('id', $driver->id)->update([
+					'image'      => $relativePath,
+					'updated_at' => date('Y-m-d H:i:s'),
+				]);
+
+				\Log::info("Foto actualizada: driver {$driver->id} → {$relativePath}");
+
+				return response()->json([
+					'status'  => true,
+					'message' => 'Foto de perfil actualizada exitosamente',
+					'data'    => [
+						'drivers_image' => url($relativePath),
+					]
+				], 200);
+
+			} catch (\Exception $e) {
+				\Log::error('Error en upload-driver-photo: ' . $e->getMessage());
+				return response()->json(['status' => false, 'message' => 'Error al subir la foto'], 500);
+			}
+		});
+	}); // fin grupo jwt.auth upload-driver-photo
+
 	// Endpoints de catálogos para dropdowns (públicos, sin autenticación)
 	Route::get('regions',       'Auth\AuthenticateController@getRegions');
 	Route::get('cities',        'Auth\AuthenticateController@getCitiesByRegion');
@@ -538,37 +603,87 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'Api'],
 
 	Route::get('drivers/nearby', function(\Illuminate\Http\Request $request){
 		try {
-			$rawDrivers = \DB::table('drivers')
-				->where('active', 1)
-				->whereNotNull('latitude')
-				->whereNotNull('longitude')
-				->orderBy('id', 'desc')
-				->limit(20)
+			$latitude  = (float) $request->input('latitude',  -17.7833);
+			$longitude = (float) $request->input('longitude', -63.1821);
+			$distance  = (int)   $request->input('distance',  5);
+
+			// Obtener conductores activos con su primer vehículo (para type_vehicle)
+			$rawDrivers = \DB::table('drivers as d')
+				->leftJoin('vehicles as v', function ($join) {
+					$join->on('v.driver_id', '=', 'd.id')
+						 ->whereRaw('v.id = (SELECT MIN(v2.id) FROM vehicles v2 WHERE v2.driver_id = d.id)');
+				})
+				->leftJoin('users as u', 'u.id', '=', 'd.user_id')
+				->where('d.active', 1)
+				->whereNotNull('d.latitude')
+				->whereNotNull('d.longitude')
+				->select(
+					'd.id',
+					'd.user_id as userId',
+					'd.movil_number as movilNumber',
+					'd.image',
+					'd.latitude',
+					'd.longitude',
+					'd.active',
+					'd.organization_id as organizationId',
+					'd.qr_image as qrImage',
+					'd.uuid',
+					'd.created_at as createdAt',
+					'd.updated_at as updatedAt',
+					\DB::raw('1 as isActiveForCareer'),
+					\DB::raw("COALESCE(v.type_vehicle, '') as type_vehicle")
+				)
+				->orderBy('d.id', 'desc')
+				->limit(30)
 				->get();
 
 			$drivers = [];
 			foreach ($rawDrivers as $d) {
+				// Filtrar por distancia si se proporcionaron coordenadas
+				$driverLat = (float) $d->latitude;
+				$driverLng = (float) $d->longitude;
+				$earthRadius = 6371; // km
+				$latDiff = deg2rad($driverLat - $latitude);
+				$lngDiff = deg2rad($driverLng - $longitude);
+				$a = sin($latDiff/2) * sin($latDiff/2) +
+					cos(deg2rad($latitude)) * cos(deg2rad($driverLat)) *
+					sin($lngDiff/2) * sin($lngDiff/2);
+				$distKm = $earthRadius * 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+				if ($distKm > $distance) continue; // fuera del radio
+
 				$drivers[] = [
-					'id' => (int)$d->id,
-					'latitude' => (string)$d->latitude,
-					'longitude' => (string)$d->longitude,
+					'id'               => (int)    $d->id,
+					'userId'           => (int)    $d->userId,
+					'movilNumber'      => (int)    $d->movilNumber,
+					'image'            => (string) ($d->image ?? ''),
+					'latitude'         => (string) $d->latitude,
+					'longitude'        => (string) $d->longitude,
+					'active'           => (int)    $d->active,
+					'organizationId'   => (int)    ($d->organizationId ?? 0),
+					'qrImage'          => $d->qrImage,
+					'uuid'             => (string) ($d->uuid ?? ''),
+					'isActiveForCareer'=> true,
+					'type_vehicle'     => (string) ($d->type_vehicle ?? ''), // ✅ Para marker emoji
+					'createdAt'        => $d->createdAt ?? now()->toISOString(),
+					'updatedAt'        => $d->updatedAt ?? now()->toISOString(),
 				];
 			}
 
 			return response()->json([
 				'status' => true,
-				'item' => [
-					'drivers' => $drivers,
-				],
+				'item'   => ['drivers' => $drivers],
 			]);
+
 		} catch (\Exception $e) {
 			\Log::error('Error v1/drivers/nearby: '.$e->getMessage());
 			return response()->json([
 				'status' => true,
-				'item' => ['drivers' => []],
+				'item'   => ['drivers' => []],
 			]);
 		}
 	});
+
 	// ==================== FIN SOPORTE PASAJERO ====================
 
 	// App

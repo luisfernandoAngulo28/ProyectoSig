@@ -80,6 +80,9 @@ Route::group(['prefix'=>'customer-admin'], function(){
     Route::get('/driver/marketing/{driverId}', 'MainController@changeField');
     Route::get('/driver/send-email-libelula/{driverId}', 'MainController@sendEmailLibelula')
     ;
+    Route::get('/driver-detail/{driverId}', 'MainController@driverDetail');
+    Route::get('/approve-driver/{driverId}', 'MainController@approveDriver');
+    Route::get('/reject-driver/{driverId}', 'MainController@rejectDriver');
     Route::get('/get-cities', 'MainController@getCities');
     Route::get('/get-roles', 'MainController@getRoles');
     Route::post('/image-save', 'MainController@imageSave');

@@ -613,23 +613,25 @@ class MainController extends Controller
 		\Log::info('Archivos recibidos:', array_keys($request->allFiles()));
 
 		$validator = \Validator::make($request->all(), [
-			'first_name' => 'required',
-			'last_name' => 'required',
-			'email' => 'required',
-			'cellphone' => 'required',
-			// 'city_id' => 'required',
+			'first_name' => 'required|string|min:2',
+			'last_name' => 'required|string|min:2',
+			'email' => 'required|email',
+			'cellphone' => 'required|string|min:7',
+			'city_id' => 'required',
+			'region_id' => 'required',
+			'type_vehicle' => 'required',
 			'license_number' => 'sometimes',
 			'license_expiration_date' => 'sometimes',
 			'number_of_passengers' => 'sometimes',
 			'password' => 'sometimes|nullable',
 			'image' => 'required|file|mimes:jpeg,png,jpg,webp,gif,bmp,heic,heif,svg',
-			'license_front_image' => 'sometimes',
-			'license_back_image' => 'sometimes',
-			'ci_front_image' => 'sometimes',
-			'ci_back_image' => 'sometimes',
-			'number_plate' => 'required',
-			'vehicle_image' => 'sometimes',
-			'side_image' => 'sometimes',
+			'license_front_image' => 'required|file',
+			'license_back_image' => 'required|file',
+			'ci_front_image' => 'required|file',
+			'ci_back_image' => 'required|file',
+			'number_plate' => 'required|string|min:2',
+			'vehicle_image' => 'required|file',
+			'side_image' => 'required|file',
 			'vehicle_brand_id' => 'required',
 			'ci_number' => 'sometimes',
 			'rubro_id' => 'sometimes',
@@ -654,25 +656,26 @@ class MainController extends Controller
 
 		], [
 			'first_name.required' => "El nombre es requerido.",
-			'password.required' => "La contraseña es requerida.",
+			'first_name.min' => "El nombre debe tener al menos 2 caracteres.",
 			'last_name.required' => "El apellido es requerido.",
-			// 'organization_id.required' => "La empresa es requerida, si no tiene una empresa debe asignarse como libre",
+			'last_name.min' => "El apellido debe tener al menos 2 caracteres.",
 			'email.required' => "El correo electrónico es requerido.",
+			'email.email' => "Ingrese un correo electrónico válido.",
 			'cellphone.required' => "Por favor ingrese su numero de celular.",
-			// 'city_id.required' => "Por favor seleccione la ciudad.",
-			'license_number.required' => "Por favor registre el número de licencia.",
-			'license_expiration_date.required' => "Seleccione la fecha de caducidad de la licencia.",
-			'image.required' => 'La imagen es requerida.',
-			'image.image' => 'El archivo debe ser una imagen.',
+			'cellphone.min' => "El celular debe tener al menos 7 dígitos.",
+			'city_id.required' => "Por favor seleccione el municipio.",
+			'region_id.required' => "Por favor seleccione el departamento.",
+			'type_vehicle.required' => "Seleccione el tipo de vehículo.",
+			'image.required' => 'La foto de perfil es requerida.',
 			'image.mimes' => 'El formato de la imagen debe ser JPEG, PNG o JPG.',
-			'license_front_image.required' => 'La imagen de la licencia es requerida.',
-			'license_back_image.required' => 'La imagen de la licencia es requerida.',
-			'ci_front_image.required' => 'La imagen de su CI es requerida.',
-			'ci_back_image.required' => 'La imagen de su CI es requerida.',
-			// 'city_id_vehicle.required' => "Por favor seleccione la ciudad.",
+			'license_front_image.required' => 'La foto del Brevete/Licencia (frente) es requerida.',
+			'license_back_image.required' => 'La foto del Brevete/Licencia (reverso) es requerida.',
+			'ci_front_image.required' => 'La foto del CI (anverso) es requerida.',
+			'ci_back_image.required' => 'La foto del CI (reverso) es requerida.',
 			'number_plate.required' => "Por favor registre el número de placa.",
-			'vehicle_image.required' => "Debe ingresar la imagen de su vehículo.",
-			'side_image.required' => "Debe ingresar la imagen de su vehículo.",
+			'number_plate.min' => "La placa debe tener al menos 2 caracteres.",
+			'vehicle_image.required' => "La foto delantera del vehículo es requerida.",
+			'side_image.required' => "La foto de costado del vehículo es requerida.",
 			'vehicle_brand_id.required' => "Seleccione la Marca de su vehículo.",
 			// 'vehicle_model_id.required' => "Seleccione el Modelo de su vehículo.",
 			// 'color.required' => "Debe seleccionar un color.",
@@ -921,6 +924,9 @@ class MainController extends Controller
 			$newDriver->active_send_money = $request->input('active_send_money') !== null  ? true : false;
 			$newDriver->is_active_for_career = $request->input('is_active_for_career') !== null  ? true : true;
 			$newDriver->tic = $request->input('tic') !== null  ? $request->input('tic') : '';
+
+			// Conductor nuevo queda INACTIVO hasta que el admin lo apruebe
+			$newDriver->active = 0;
 
 			// * IMAGENES - Procesadas directamente
 			$imageFields = [
@@ -1379,5 +1385,108 @@ class MainController extends Controller
 		}
 
 		return redirect('/customer-admin/model-list/driver')->with('message_success', 'Conductor actualizado.');
+	}
+
+	public function driverDetail($driverId)
+	{
+		// Redirigir al listado general para evitar el error de $menu_main no definido
+		return redirect('/customer-admin/model/driver/view/' . $driverId);
+	}
+
+	public function approveDriver($driverId)
+	{
+		try {
+			$driver = \App\Driver::findOrFail($driverId);
+			$user = \App\User::find($driver->user_id);
+
+			if (!$user) {
+				return redirect()->back()->with('message_error', 'No se encontró el usuario asociado al conductor.');
+			}
+
+			// Verificar que tenga al menos un vehículo
+			$vehicleCount = \App\DriverVehicle::where('parent_id', $driver->id)->count();
+			if ($vehicleCount == 0) {
+				return redirect()->back()->with('message_error', 'No se puede aprobar: el conductor debe tener al menos un vehículo.');
+			}
+
+			// Aprobar: marcar usuario como verificado y conductor como activo
+			$user->is_verify = 1;
+			$user->save();
+
+			$driver->active = 1;
+			$driver->approved_at = \Carbon\Carbon::now();
+			$driver->free_trial_until = date('Y-m-d', strtotime('+30 days'));
+			$driver->save();
+
+			\Log::info("Conductor aprobado desde admin: Driver ID {$driver->id}, User ID {$user->id}, free_trial_until: {$driver->free_trial_until}");
+
+			// Enviar notificación push al conductor
+			$driverName = trim($driver->first_name . ' ' . $driver->last_name);
+			$freeUntil = date('d/m/Y', strtotime($driver->free_trial_until));
+			$pushTitle = '¡Bienvenido a AnDre!';
+			$pushBody = "Hola {$driverName}, tu registro ha sido aprobado. ¡Ya estás registrado! Tienes 30 días GRATIS para usar la app hasta el {$freeUntil}. Después podrás recargar tu saldo.";
+
+			if (!empty($user->token_firebase)) {
+				$pushResult = \App\Helpers\FcmHelper::sendNotification(
+					$user->token_firebase,
+					$pushTitle,
+					$pushBody,
+					[
+						'type' => 'driver_approved',
+						'driver_id' => (string) $driver->id,
+						'free_trial_until' => $driver->free_trial_until,
+					]
+				);
+				\Log::info("Push notification resultado: " . json_encode($pushResult));
+			} else {
+				\Log::warning("Conductor {$driver->id} no tiene token Firebase, no se envió push.");
+			}
+
+			// Guardar notificación en base de datos (si existe la tabla)
+			try {
+				\DB::table('notifications')->insert([
+					'user_id' => $user->id,
+					'title' => $pushTitle,
+					'message' => $pushBody,
+					'type' => 'driver_approved',
+					'created_at' => \Carbon\Carbon::now(),
+					'updated_at' => \Carbon\Carbon::now(),
+				]);
+			} catch (\Throwable $notifErr) {
+				\Log::warning("No se pudo guardar notificación en DB: " . $notifErr->getMessage());
+			}
+
+			return redirect('/customer-admin/model/driver/view/' . $driver->id)
+				->with('message_success', "✅ Conductor aprobado exitosamente. 30 días gratis hasta el {$freeUntil}.");
+
+		} catch (\Throwable $e) {
+			\Log::error("Error al aprobar conductor {$driverId}: " . $e->getMessage());
+			return redirect()->back()->with('message_error', 'Error al aprobar: ' . $e->getMessage());
+		}
+	}
+
+	public function rejectDriver($driverId)
+	{
+		try {
+			$driver = \App\Driver::findOrFail($driverId);
+			$user = \App\User::find($driver->user_id);
+
+			if ($user) {
+				$user->is_verify = 0;
+				$user->save();
+			}
+
+			$driver->active = 0;
+			$driver->save();
+
+			\Log::info("Conductor rechazado/bloqueado desde admin: Driver ID {$driver->id}");
+
+			return redirect('/customer-admin/model/driver/view/' . $driver->id)
+				->with('message_success', 'Conductor rechazado/bloqueado.');
+
+		} catch (\Throwable $e) {
+			\Log::error("Error al rechazar conductor {$driverId}: " . $e->getMessage());
+			return redirect()->back()->with('message_error', 'Error al rechazar: ' . $e->getMessage());
+		}
 	}
 }

@@ -82,6 +82,13 @@ class AuthenticateController extends Controller {
         // Añadir campos de conductor si existen consultando directamente para evitar errores de relación
         $driver = \App\Driver::where('user_id', $user->id)->first();
         if($driver){
+            // Verificar si el conductor está aprobado
+            if ($driver->active != 1) {
+                return response()->json([
+                    'status' => false,
+                    'error' => 'Tu cuenta está pendiente de aprobación. Espera la confirmación por WhatsApp.',
+                ], 403);
+            }
             $userData['drivers_id'] = $driver->id;
             $userData['drivers_license_number'] = $driver->license_number;
             $userData['drivers_car_with_grill'] = (int)$driver->car_with_grill;
@@ -1379,11 +1386,18 @@ class AuthenticateController extends Controller {
             $message = "Tu código de acceso AnDre Conductor es: {$code}. Válido por 10 minutos.";
             $delivery = $this->sendOtpMessage($phone, $message);
             
-            return response()->json([
+            // Incluir código en respuesta si Twilio no está configurado (modo desarrollo)
+            $responseData = [
                 'status' => true,
                 'message' => $delivery['channel'] === 'whatsapp' ? 'Código enviado a tu WhatsApp' : 'Código enviado a tu teléfono',
                 'delivery_channel' => $delivery['channel'],
-            ], 200);
+            ];
+            
+            if ($delivery['channel'] === 'none' || $delivery['channel'] === 'log') {
+                $responseData['code'] = $code;
+            }
+            
+            return response()->json($responseData, 200);
             
         } catch (\Exception $e) {
             \Log::error('Error en loginWithPhoneDriver: ' . $e->getMessage());
