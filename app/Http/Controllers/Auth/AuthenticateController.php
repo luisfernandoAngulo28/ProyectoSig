@@ -1371,16 +1371,21 @@ class AuthenticateController extends Controller {
             // Generar código OTP de 6 dígitos
             $code = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
             
-            // Guardar OTP sin hooks de modelo.
-            \DB::table('otps')->insert([
+            // Guardar OTP — compatible con tabla otps con o sin columnas phone/type
+            $otpInsert = [
                 'parent_id' => $driver->id,
-                'phone' => $phone,
-                'code' => $code,
-                'type' => 'phone',
+                'code'      => $code,
                 'time_expiration_code' => time() + 600,
                 'created_at' => date('Y-m-d H:i:s'),
                 'updated_at' => date('Y-m-d H:i:s'),
-            ]);
+            ];
+            if (\Schema::hasColumn('otps', 'phone')) {
+                $otpInsert['phone'] = $phone;
+            }
+            if (\Schema::hasColumn('otps', 'type')) {
+                $otpInsert['type'] = 'phone';
+            }
+            \DB::table('otps')->insert($otpInsert);
             
             // Enviar OTP por canal configurado (whatsapp por defecto)
             $message = "Tu código de acceso AnDre Conductor es: {$code}. Válido por 10 minutos.";
@@ -1469,13 +1474,14 @@ class AuthenticateController extends Controller {
                     ], 400);
                 }
             } else {
-                // Validar OTP legacy
-                $otp = Otp::where('parent_id', $driver->id)
-                          ->where('code', $code)
-                             ->where('type', 'phone')
-                             ->where('time_expiration_code', '>', time())
-                          ->orderBy('created_at', 'desc')
-                          ->first();
+                // Validar OTP — busca por parent_id + code sin depender de columna 'type'
+                // (compatible con tabla otps con o sin migración AddPhoneToOtpsTable)
+                $otp = \DB::table('otps')
+                    ->where('parent_id', $driver->id)
+                    ->where('code', $code)
+                    ->where('time_expiration_code', '>', time())
+                    ->orderBy('created_at', 'desc')
+                    ->first();
                 
                 if (!$otp) {
                     return response()->json([
@@ -1485,7 +1491,7 @@ class AuthenticateController extends Controller {
                 }
                 
                 // Eliminar OTP usado
-                $otp->delete();
+                \DB::table('otps')->where('id', $otp->id)->delete();
             }
             
             // Verificar estado de foto facial (actualización mensual)
