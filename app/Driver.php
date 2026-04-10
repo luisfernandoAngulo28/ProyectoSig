@@ -87,6 +87,10 @@ class Driver extends Model {
         return $this->belongsTo('Solunes\Business\App\City');
     }
 
+    public function region() {
+        return $this->belongsTo('Solunes\Business\App\Region');
+    }
+
     public function driver_payment_methods() {
         return $this->hasMany('\App\DriverPaymentMethod', 'parent_id', 'id');
     }
