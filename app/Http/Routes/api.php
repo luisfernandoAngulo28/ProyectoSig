@@ -693,6 +693,31 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'Api'],
 	Route::post('register-assistance', 'AppController@postRegisterAssistance'); // Registrar Asistencia
 	Route::post('generate-payment', 'AppController@postGeneratePayment'); // Descargar NFCs
 
+	// ──── RUTA DEBUG TEMPORAL ─────────────────────────────────────────────
+	Route::get('debug-driver/{id}', function($id){
+		$driver = \DB::table('drivers')->where('id', $id)->orWhere('user_id', $id)->first();
+		if (!$driver) return response()->json(['error' => 'driver not found']);
+		
+		$vehicles = \DB::table('driver_vehicles')
+			->where('parent_id', $driver->id)
+			->orWhere('parent_id', $driver->user_id)
+			->get();
+		
+		$allVehicles = \DB::table('driver_vehicles')
+			->orderBy('id', 'desc')
+			->limit(10)
+			->get(['id','parent_id','number_plate','vehicle_brand_id','active']);
+		
+		return response()->json([
+			'driver_id'     => $driver->id,
+			'user_id'       => $driver->user_id,
+			'driver_image'  => $driver->image,
+			'vehicles_found' => $vehicles,
+			'last_10_vehicles_in_table' => $allVehicles,
+		]);
+	});
+	// ──── FIN DEBUG ───────────────────────────────────────────────────────
+
 	// Perfil de conductor (v1/drivers/{id})
 	Route::get('drivers/{id}', function($id){
 		try {
