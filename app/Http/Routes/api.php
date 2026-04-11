@@ -721,9 +721,12 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'Api'],
                     : null,
 			];
 			
-			// Verificamos vehículos — sin filtrar por active para mostrar todos
+			// Verificamos vehículos — buscar por driver.id Y por driver.user_id (fallback)
 			$vehicles = [];
-			$dvRel = \DB::table('driver_vehicles')->where('parent_id', $driver->id)->get();
+			$driverIds = array_filter([$driver->id, $driver->user_id]);
+			$dvRel = \DB::table('driver_vehicles')
+				->whereIn('parent_id', $driverIds)
+				->get();
 			foreach($dvRel as $dv){
 				$brand = \DB::table('vehicle_brands')->where('id', $dv->vehicle_brand_id)->first();
 				$model = \DB::table('vehicle_models')->where('id', $dv->vehicle_model_id)->first();
@@ -739,6 +742,7 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'Api'],
 					'vehicle_model_name'  => $moName,
 					'plate'               => $dv->number_plate ?: '',
 					'type_vehicle'        => $dv->type_vehicle ?? '',
+					'color'               => $dv->color ?? '',
 					'active'              => $dv->active ?? 0,
 				];
 			}
