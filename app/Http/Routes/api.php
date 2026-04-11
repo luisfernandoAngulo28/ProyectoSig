@@ -728,20 +728,38 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'Api'],
 				return response()->json(['status'=>false, 'message'=>'No se encontró el perfil de conductor.'], 404);
 			}
 
-			// Resolver imagen del conductor (del formulario de registro del admin)
+			// Resolver imagen del conductor — puede ser solo nombre, ruta relativa, o URL completa
 			$driverImageRaw = $driver->image ?? null;
 			$driverImage = null;
 			if ($driverImageRaw) {
-				$driverImage = (strpos($driverImageRaw, 'http') === 0)
-					? $driverImageRaw
-					: url($driverImageRaw);
+				if (strpos($driverImageRaw, 'http') === 0) {
+					// Ya es URL completa
+					$driverImage = $driverImageRaw;
+				} elseif (strpos($driverImageRaw, '/') !== false) {
+					// Ruta relativa tipo "driver-image/normal/xxx.jpg"
+					$s3Bucket = env('AWS_BUCKET', 'taxisapp-images-2026');
+					$s3Region = env('AWS_DEFAULT_REGION', 'us-east-2');
+					$driverImage = "https://{$s3Bucket}.s3.{$s3Region}.amazonaws.com/{$driverImageRaw}";
+				} else {
+					// Solo nombre de archivo — construir ruta completa en S3
+					$s3Bucket = env('AWS_BUCKET', 'taxisapp-images-2026');
+					$s3Region = env('AWS_DEFAULT_REGION', 'us-east-2');
+					$driverImage = "https://{$s3Bucket}.s3.{$s3Region}.amazonaws.com/driver-image/normal/{$driverImageRaw}";
+				}
 			}
 			// Fallback: intentar obtener la foto del usuario vinculado
 			if (!$driverImage && $driver->user_id) {
 				$linkedUser = \DB::table('users')->where('id', $driver->user_id)->first();
 				if ($linkedUser && !empty($linkedUser->image)) {
 					$rawImg = $linkedUser->image;
-					$driverImage = (strpos($rawImg, 'http') === 0) ? $rawImg : url($rawImg);
+					if (strpos($rawImg, 'http') === 0) {
+						$driverImage = $rawImg;
+					} else {
+						$s3Bucket = env('AWS_BUCKET', 'taxisapp-images-2026');
+						$s3Region = env('AWS_DEFAULT_REGION', 'us-east-2');
+						$folder = strpos($rawImg, '/') !== false ? '' : 'user-image/normal/';
+						$driverImage = "https://{$s3Bucket}.s3.{$s3Region}.amazonaws.com/{$folder}{$rawImg}";
+					}
 				}
 			}
 
