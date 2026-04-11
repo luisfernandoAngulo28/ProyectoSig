@@ -703,6 +703,23 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'Api'],
 				return response()->json(['status'=>false, 'message'=>'No se encontró el perfil de conductor.'], 404);
 			}
 
+			// Resolver imagen del conductor (del formulario de registro del admin)
+			$driverImageRaw = $driver->image ?? null;
+			$driverImage = null;
+			if ($driverImageRaw) {
+				$driverImage = (strpos($driverImageRaw, 'http') === 0)
+					? $driverImageRaw
+					: url($driverImageRaw);
+			}
+			// Fallback: intentar obtener la foto del usuario vinculado
+			if (!$driverImage && $driver->user_id) {
+				$linkedUser = \DB::table('users')->where('id', $driver->user_id)->first();
+				if ($linkedUser && !empty($linkedUser->image)) {
+					$rawImg = $linkedUser->image;
+					$driverImage = (strpos($rawImg, 'http') === 0) ? $rawImg : url($rawImg);
+				}
+			}
+
 			$data = [
 				'drivers_id' => $driver->id,
 				'user_id' => $driver->user_id,
@@ -710,12 +727,14 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'Api'],
 				'user_first_name' => $driver->first_name,
 				'user_last_name' => $driver->last_name,
 				'user_cellphone' => $driver->cellphone,
+				'user_ci_number' => $driver->ci_number ?? $driver->license_number ?? null,
+				'user_gender' => $driver->gender ?? null,
 				'drivers_license_number' => $driver->license_number,
 				'drivers_car_with_grill' => (int)$driver->car_with_grill,
 				'drivers_travel_with_pets' => (int)$driver->travel_with_pets,
 				'driver_rating_total' => '5.0', 
 				'rides_total' => '0',
-				'drivers_image' => (strpos($driver->image, 'http') === 0) ? $driver->image : url($driver->image),
+				'drivers_image' => $driverImage,
 				'qr_image' => $driver->qr_image
                     ? ((strpos($driver->qr_image, 'http') === 0) ? $driver->qr_image : url($driver->qr_image))
                     : null,
