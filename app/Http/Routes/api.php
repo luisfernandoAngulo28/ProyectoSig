@@ -721,9 +721,9 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'Api'],
                     : null,
 			];
 			
-			// Verificamos vehículos usando DB::table
+			// Verificamos vehículos — sin filtrar por active para mostrar todos
 			$vehicles = [];
-			$dvRel = \DB::table('driver_vehicles')->where('parent_id', $driver->id)->where('active', 1)->get();
+			$dvRel = \DB::table('driver_vehicles')->where('parent_id', $driver->id)->get();
 			foreach($dvRel as $dv){
 				$brand = \DB::table('vehicle_brands')->where('id', $dv->vehicle_brand_id)->first();
 				$model = \DB::table('vehicle_models')->where('id', $dv->vehicle_model_id)->first();
@@ -732,9 +732,14 @@ Route::group(['prefix'=>'v1', 'middleware' => ['jwt.auth'], 'namespace'=>'Api'],
 				$moName = $model ? $model->name : '';
 				
 				$vehicles[] = [
-					'id' => $dv->id,
-					'vehicle_name' => trim($brName . ' ' . $moName) ?: 'Vehículo',
-					'plate' => $dv->number_plate ?: '',
+					'id'                  => $dv->id,
+					'number_plate'        => $dv->number_plate ?: '',
+					'vehicle_name'        => trim($brName . ' ' . $moName) ?: 'Vehículo',
+					'vehicle_brand_name'  => $brName,
+					'vehicle_model_name'  => $moName,
+					'plate'               => $dv->number_plate ?: '',
+					'type_vehicle'        => $dv->type_vehicle ?? '',
+					'active'              => $dv->active ?? 0,
 				];
 			}
 			$data['driver_vehicles'] = $vehicles;
