@@ -333,6 +333,9 @@ Route::group(['prefix' => 'api-auth'], function(){
 		Route::post('register-vehicle', 'Auth\AuthenticateController@registerDriverVehicle');
 		Route::post('update-facial-photo', 'Auth\AuthenticateController@updateFacialPhoto');
 
+		// Endpoint para obtener perfil completo del conductor
+		Route::get('driver-profile', 'Auth\AuthenticateController@getDriverProfile');
+
 		// Endpoint para APROBAR CONDUCTOR (Admin - requiere autenticación)
 		Route::post('approve-driver', 'Auth\AuthenticateController@approveDriver');
 	});

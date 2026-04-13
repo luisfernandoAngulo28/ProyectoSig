@@ -2151,6 +2151,73 @@ class AuthenticateController extends Controller {
      * GET /api-auth/organizations?city_id=X
      * Retorna organizaciones/federaciones de una ciudad.
      */
+    public function getDriverProfile(Request $request)
+    {
+        try {
+            $user = \JWTAuth::parseToken()->authenticate();
+            if (!$user) {
+                return response()->json(['status' => false, 'message' => 'No autenticado.'], 401);
+            }
+
+            $driver = \App\Driver::where('user_id', $user->id)->first();
+            if (!$driver) {
+                return response()->json(['status' => false, 'message' => 'No se encontró registro de conductor.'], 404);
+            }
+
+            // Obtener vehículos del conductor con marca y modelo
+            $vehicles = \DB::table('driver_vehicles')
+                ->leftJoin('vehicle_brands', 'driver_vehicles.vehicle_brand_id', '=', 'vehicle_brands.id')
+                ->leftJoin('vehicle_models', 'driver_vehicles.vehicle_model_id', '=', 'vehicle_models.id')
+                ->where('driver_vehicles.parent_id', $driver->id)
+                ->select([
+                    'driver_vehicles.id',
+                    'driver_vehicles.number_plate',
+                    'driver_vehicles.color',
+                    'driver_vehicles.model_year',
+                    'driver_vehicles.type',
+                    'driver_vehicles.vehicle_image',
+                    'driver_vehicles.side_image',
+                    'driver_vehicles.vehicle_engine',
+                    'driver_vehicles.active',
+                    'vehicle_brands.name as brand_name',
+                    'vehicle_models.name as model_name',
+                ])
+                ->get();
+
+            // Calcular rating promedio
+            $avgRating = \DB::table('driver_ratings')
+                ->where('parent_id', $driver->id)
+                ->avg('driver_rating');
+            $totalTrips = \DB::table('driver_ratings')
+                ->where('parent_id', $driver->id)
+                ->count();
+
+            $profileData = [
+                'driver_id'       => $driver->id,
+                'first_name'      => $driver->first_name,
+                'last_name'       => $driver->last_name,
+                'cellphone'       => $driver->cellphone,
+                'email'           => $driver->email,
+                'image'           => $driver->image,
+                'qr_image'        => $driver->qr_image,
+                'license_number'  => $driver->license_number,
+                'gender'          => $driver->gender,
+                'active'          => (int) $driver->active,
+                'rating'          => $avgRating ? round($avgRating, 1) : 5.0,
+                'total_trips'     => $totalTrips,
+                'vehicles'        => $vehicles,
+            ];
+
+            return response()->json([
+                'status' => true,
+                'data'   => $profileData,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('getDriverProfile: ' . $e->getMessage());
+            return response()->json(['status' => false, 'message' => 'Error al obtener perfil del conductor.'], 500);
+        }
+    }
+
     public function getOrganizationsByCity(Request $request)
     {
         try {
