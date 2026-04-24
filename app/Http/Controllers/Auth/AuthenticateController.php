@@ -1502,25 +1502,9 @@ class AuthenticateController extends Controller {
                     ->first();
                 
                 if (!$otp) {
-                    $allOtps = \DB::table('otps')->where('parent_id', $driver->id)->orderBy('created_at', 'desc')->get();
-                    $otpDebug = [];
-                    foreach ($allOtps as $o) {
-                        $otpDebug[] = [
-                            'id'         => $o->id,
-                            'code'       => $o->code,
-                            'expires_at' => $o->time_expiration_code,
-                            'expired'    => $o->time_expiration_code < time(),
-                        ];
-                    }
                     return response()->json([
                         'status' => false,
                         'message' => 'Código inválido o expirado',
-                        '_debug' => [
-                            'driver_id'     => $driver->id,
-                            'code_received' => $code,
-                            'time_now'      => time(),
-                            'otps_found'    => $otpDebug,
-                        ],
                     ], 400);
                 }
                 
