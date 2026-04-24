@@ -1039,13 +1039,31 @@ class AuthenticateController extends Controller {
             ], 400);
         }
         
-        // Verificar que el conductor no exista
+        // Verificar que el conductor no exista por celular
         $driverExists = \App\Driver::where('cellphone', $phone)->first();
         if ($driverExists) {
             return response()->json([
                 'status' => false,
-                'message' => 'Este número ya está registrado'
+                'message' => 'Este número de celular ya está registrado como conductor'
             ], 400);
+        }
+        
+        // Verificar que el email no esté duplicado (si se envió)
+        if ($request->has('email') && !empty($request->email)) {
+            $emailExists = \App\Driver::where('email', $request->email)->first();
+            if ($emailExists) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Este email ya está registrado como conductor'
+                ], 400);
+            }
+            $userEmailExists = \App\User::where('email', $request->email)->first();
+            if ($userEmailExists) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Este email ya está registrado'
+                ], 400);
+            }
         }
         
         // Separar nombre y apellido
@@ -1484,9 +1502,25 @@ class AuthenticateController extends Controller {
                     ->first();
                 
                 if (!$otp) {
+                    $allOtps = \DB::table('otps')->where('parent_id', $driver->id)->orderBy('created_at', 'desc')->get();
+                    $otpDebug = [];
+                    foreach ($allOtps as $o) {
+                        $otpDebug[] = [
+                            'id'         => $o->id,
+                            'code'       => $o->code,
+                            'expires_at' => $o->time_expiration_code,
+                            'expired'    => $o->time_expiration_code < time(),
+                        ];
+                    }
                     return response()->json([
                         'status' => false,
                         'message' => 'Código inválido o expirado',
+                        '_debug' => [
+                            'driver_id'     => $driver->id,
+                            'code_received' => $code,
+                            'time_now'      => time(),
+                            'otps_found'    => $otpDebug,
+                        ],
                     ], 400);
                 }
                 
@@ -2154,12 +2188,19 @@ class AuthenticateController extends Controller {
     public function getDriverProfile(Request $request)
     {
         try {
-            $user = \JWTAuth::parseToken()->authenticate();
-            if (!$user) {
+            // El JWT puede ser emitido con App\Driver o App\User como subject.
+            // Extraemos el sub (ID) directamente del payload para buscar el conductor.
+            $payload = \JWTAuth::parseToken()->getPayload();
+            $subId = $payload->get('sub');
+            if (!$subId) {
                 return response()->json(['status' => false, 'message' => 'No autenticado.'], 401);
             }
 
-            $driver = \App\Driver::where('user_id', $user->id)->first();
+            // Intentar buscar primero como driver.id, luego como user_id
+            $driver = \App\Driver::find($subId);
+            if (!$driver) {
+                $driver = \App\Driver::where('user_id', $subId)->first();
+            }
             if (!$driver) {
                 return response()->json(['status' => false, 'message' => 'No se encontró registro de conductor.'], 404);
             }
@@ -2173,16 +2214,43 @@ class AuthenticateController extends Controller {
                     'driver_vehicles.id',
                     'driver_vehicles.number_plate',
                     'driver_vehicles.color',
-                    'driver_vehicles.model_year',
+                    'driver_vehicles.model_year as vehicle_model_year',
                     'driver_vehicles.type',
                     'driver_vehicles.vehicle_image',
                     'driver_vehicles.side_image',
                     'driver_vehicles.vehicle_engine',
                     'driver_vehicles.active',
-                    'vehicle_brands.name as brand_name',
-                    'vehicle_models.name as model_name',
+                    'vehicle_brands.name as vehicle_brand_name',
+                    'vehicle_models.name as vehicle_model_name',
                 ])
                 ->get();
+
+            // Formatear vehículos para compatibilidad con la app Flutter
+            $formattedVehicles = collect($vehicles)->map(function ($v) {
+                // Inferir tipo de vehículo desde la marca si type es genérico
+                $typeVehicle = $v->type ?? '';
+                $brandLower = strtolower($v->vehicle_brand_name ?? '');
+                if (strpos($brandLower, 'moto') !== false || strpos($brandLower, 'motorcycle') !== false) {
+                    $typeVehicle = 'moto';
+                } elseif (strpos($brandLower, 'torito') !== false || strpos($brandLower, 'motocarro') !== false) {
+                    $typeVehicle = 'torito';
+                }
+
+                return [
+                    'id'                 => $v->id,
+                    'number_plate'       => $v->number_plate ?? '',
+                    'vehicle_name'       => $v->vehicle_brand_name ?? '',
+                    'vehicle_brand_name' => $v->vehicle_brand_name ?? '',
+                    'vehicle_model_name' => $v->vehicle_model_name ?? '',
+                    'plate'              => $v->number_plate ?? '',
+                    'type_vehicle'       => $typeVehicle,
+                    'color'              => $v->color ?? '',
+                    'vehicle_image'      => $v->vehicle_image,
+                    'side_image'         => $v->side_image,
+                    'vehicle_model_year' => $v->vehicle_model_year ?? '',
+                    'active'             => $v->active,
+                ];
+            });
 
             // Calcular rating promedio
             $avgRating = \DB::table('driver_ratings')
@@ -2192,25 +2260,47 @@ class AuthenticateController extends Controller {
                 ->where('parent_id', $driver->id)
                 ->count();
 
+            // Construir URL completa de imagen
+            $imageUrl = $driver->image;
+            if ($imageUrl && !str_starts_with($imageUrl, 'http')) {
+                $s3Bucket = env('AWS_BUCKET', 'taxisapp-images-2026');
+                $s3Region = env('AWS_REGION', 'us-east-2');
+                $imageUrl = "https://{$s3Bucket}.s3.{$s3Region}.amazonaws.com/driver-image/normal/{$imageUrl}";
+            }
+
+            // Formato compatible con DriverModel.fromJson de Flutter
             $profileData = [
-                'driver_id'       => $driver->id,
-                'first_name'      => $driver->first_name,
-                'last_name'       => $driver->last_name,
-                'cellphone'       => $driver->cellphone,
-                'email'           => $driver->email,
-                'image'           => $driver->image,
-                'qr_image'        => $driver->qr_image,
-                'license_number'  => $driver->license_number,
-                'gender'          => $driver->gender,
-                'active'          => (int) $driver->active,
-                'rating'          => $avgRating ? round($avgRating, 1) : 5.0,
-                'total_trips'     => $totalTrips,
-                'vehicles'        => $vehicles,
+                'drivers_id'                       => $driver->id,
+                'user_id'                          => $driver->user_id,
+                'user_name'                        => trim($driver->first_name . ' ' . $driver->last_name),
+                'user_first_name'                  => $driver->first_name,
+                'user_last_name'                   => $driver->last_name,
+                'user_cellphone'                   => $driver->cellphone,
+                'user_ci_number'                   => $driver->ci_number,
+                'user_gender'                      => $driver->gender,
+                'drivers_license_number'           => $driver->license_number,
+                'drivers_license_expiration_date'  => $driver->license_expiration_date,
+                'drivers_number_of_passengers'     => $driver->number_of_passengers,
+                'drivers_car_with_grill'           => (int) $driver->car_with_grill,
+                'drivers_travel_with_pets'         => (int) $driver->travel_with_pets,
+                'drivers_baby_chair'               => (int) ($driver->baby_chair ?? 0),
+                'drivers_image'                    => $imageUrl,
+                'qr_image'                         => $driver->qr_image,
+                'appkey'                           => $driver->appkey,
+                'driver_rating_total'              => $avgRating ? (string) round($avgRating, 1) : '5.0',
+                'rides_total'                      => (string) $totalTrips,
+                'vehicle_rating_total'             => '5.0',
+                'bank_account_number'              => $driver->bank_account_number,
+                'bank_id'                          => $driver->bank_id,
+                'organization_name'                => null,
+                'organization_logo_image'          => null,
+                'driver_vehicles'                  => $formattedVehicles,
+                'driver_ratings_resenias'          => [],
             ];
 
             return response()->json([
                 'status' => true,
-                'data'   => $profileData,
+                'data'   => [$profileData],
             ], 200);
         } catch (\Exception $e) {
             \Log::error('getDriverProfile: ' . $e->getMessage());
